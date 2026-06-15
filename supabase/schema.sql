@@ -29,20 +29,30 @@ create table if not exists org_members (
 
 alter table org_members enable row level security;
 
+-- Security-definer function avoids infinite recursion when RLS checks org_members from within org_members policies
+create or replace function is_org_member(p_org_id uuid)
+returns boolean as $$
+  select exists (
+    select 1 from org_members
+    where org_id = p_org_id and user_id = auth.uid()
+  );
+$$ language sql security definer;
+
+create or replace function is_org_owner(p_org_id uuid)
+returns boolean as $$
+  select exists (
+    select 1 from org_members
+    where org_id = p_org_id and user_id = auth.uid() and role = 'owner'
+  );
+$$ language sql security definer;
+
 create policy "Members can read their own org"
   on org_members for select
   using (auth.uid() = user_id);
 
 create policy "Org owner can manage members"
   on org_members for all
-  using (
-    exists (
-      select 1 from org_members m
-      where m.org_id = org_members.org_id
-        and m.user_id = auth.uid()
-        and m.role = 'owner'
-    )
-  );
+  using (is_org_owner(org_id));
 
 -- ─────────────────────────────────────────────
 -- EMPLOYEES
