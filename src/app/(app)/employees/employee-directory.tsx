@@ -195,15 +195,43 @@ function CsvUploadModal({ open, onClose, existingEmails, onImport }: CsvModalPro
     onClose();
   }
 
+  const STEP_LABELS = ["Import Employee Directory", "Review Import", "Import Complete"];
+  const stepIndex = step === "select" ? 0 : step === "preview" ? 1 : 2;
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="bg-[#1a1a1a] border-white/10 text-white sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-white text-lg">
-            {step === "success" ? "Import Complete" : "Upload Employee Directory"}
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-white text-lg">
+              {STEP_LABELS[stepIndex]}
+            </DialogTitle>
+            {step !== "success" && (
+              <span className="text-xs text-gray-500 font-medium">
+                Step {stepIndex + 1} of 3
+              </span>
+            )}
+          </div>
+
+          {/* Step progress dots */}
+          <div className="flex items-center gap-1.5 pt-1">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className={clsx(
+                  "h-1 rounded-full transition-all",
+                  i === stepIndex
+                    ? "bg-emerald-500 w-6"
+                    : i < stepIndex
+                    ? "bg-emerald-800 w-3"
+                    : "bg-white/10 w-3"
+                )}
+              />
+            ))}
+          </div>
         </DialogHeader>
 
+        {/* ── Step 1: Import Employee Directory ── */}
         {step === "select" && (
           <div className="space-y-4 py-2">
             <div
@@ -244,11 +272,15 @@ function CsvUploadModal({ open, onClose, existingEmails, onImport }: CsvModalPro
               />
             </div>
             <p className="text-xs text-gray-600 text-center">
-              Columns: <span className="text-gray-500">name, email, department, title, linkedin_url, instagram_handle</span>
+              Required columns:{" "}
+              <span className="text-gray-500">name, email</span>
+              {" · "}
+              <span className="text-gray-600">optional: department, title, linkedin_url, instagram_handle</span>
             </p>
           </div>
         )}
 
+        {/* ── Step 2: Review Import ── */}
         {step === "preview" && (
           <div className="space-y-4 py-2">
             {/* Stats */}
@@ -272,23 +304,27 @@ function CsvUploadModal({ open, onClose, existingEmails, onImport }: CsvModalPro
               <table className="w-full text-xs">
                 <thead className="sticky top-0 bg-[#1a1a1a]">
                   <tr className="border-b border-white/5">
-                    <th className="text-left px-3 py-2 text-gray-500 font-semibold">Name</th>
-                    <th className="text-left px-3 py-2 text-gray-500 font-semibold">Email</th>
-                    <th className="text-left px-3 py-2 text-gray-500 font-semibold">Dept</th>
-                    <th className="px-3 py-2 text-gray-500 font-semibold w-14">Status</th>
+                    <th className="text-left px-3 py-2.5 text-gray-500 font-semibold">Name</th>
+                    <th className="text-left px-3 py-2.5 text-gray-500 font-semibold">Email</th>
+                    <th className="text-left px-3 py-2.5 text-gray-500 font-semibold">Department</th>
+                    <th className="px-3 py-2.5 text-gray-500 font-semibold w-14 text-center">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {preview.map((row, i) => (
                     <tr key={i} className="border-b border-white/5 last:border-0">
-                      <td className="px-3 py-2 text-white">{row.name}</td>
+                      <td className="px-3 py-2 text-white font-medium">{row.name}</td>
                       <td className="px-3 py-2 text-gray-400">{row.email}</td>
                       <td className="px-3 py-2 text-gray-400">{row.department || "—"}</td>
                       <td className="px-3 py-2 text-center">
                         {existingEmails.has(row.email) ? (
-                          <span className="text-amber-400 text-[10px]">update</span>
+                          <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-amber-900/40 text-amber-300">
+                            update
+                          </span>
                         ) : (
-                          <span className="text-emerald-400 text-[10px]">new</span>
+                          <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-emerald-900/40 text-emerald-300">
+                            new
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -305,7 +341,7 @@ function CsvUploadModal({ open, onClose, existingEmails, onImport }: CsvModalPro
                 }}
                 className="text-sm text-gray-500 hover:text-white transition-colors"
               >
-                ← Choose different file
+                ← Back
               </button>
               <button
                 onClick={handleImport}
@@ -318,16 +354,21 @@ function CsvUploadModal({ open, onClose, existingEmails, onImport }: CsvModalPro
           </div>
         )}
 
+        {/* ── Step 3: Import Complete ── */}
         {step === "success" && (
           <div className="py-10 text-center space-y-3">
-            <CheckCircle2 className="w-14 h-14 text-emerald-400 mx-auto" />
-            <p className="text-lg font-semibold text-white">Employees Imported!</p>
+            <div className="w-16 h-16 rounded-full bg-emerald-900/40 border border-emerald-700/30 flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+            </div>
+            <p className="text-lg font-semibold text-white">Import Complete!</p>
             <p className="text-sm text-gray-400">
-              {resultCounts.newCount} added · {resultCounts.existCount} updated
+              <span className="text-emerald-300 font-medium">{resultCounts.newCount} added</span>
+              {" · "}
+              <span className="text-amber-300 font-medium">{resultCounts.existCount} updated</span>
             </p>
             <button
               onClick={handleClose}
-              className="mt-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-6 py-2 rounded-lg transition-colors inline-block"
+              className="mt-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-6 py-2.5 rounded-lg transition-colors inline-block"
             >
               Done
             </button>
