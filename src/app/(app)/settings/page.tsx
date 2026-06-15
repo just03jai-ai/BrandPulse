@@ -3,7 +3,9 @@ import { SettingsClient } from "./settings-client";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = supabase
+    ? (await supabase.auth.getUser()).data.user
+    : null;
 
   return (
     <div className="p-8 max-w-3xl">

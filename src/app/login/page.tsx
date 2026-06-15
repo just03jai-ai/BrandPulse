@@ -19,6 +19,12 @@ export default function LoginPage() {
     setLoading(true);
     const supabase = createClient();
 
+    if (!supabase) {
+      toast.error("Supabase not configured. Add credentials to .env.local.");
+      setLoading(false);
+      return;
+    }
+
     const { error } =
       mode === "signin"
         ? await supabase.auth.signInWithPassword({ email, password })

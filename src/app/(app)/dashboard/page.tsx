@@ -3,13 +3,15 @@ import { BarChart2, Users, FileText, Trophy } from "lucide-react";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = (await supabase?.auth.getUser())?.data.user ?? null;
 
   return (
     <div className="p-8">
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
-        <p className="text-gray-400 mt-1">Welcome back{user?.email ? `, ${user.email}` : ""}</p>
+        <p className="text-gray-400 mt-1 text-sm">
+          Welcome back{user?.email ? `, ${user.email}` : ""}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -28,6 +30,15 @@ export default async function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {!supabase && (
+        <div className="mb-4 bg-amber-950 border border-amber-800 rounded-xl p-4 text-sm text-amber-300">
+          <strong>Supabase not configured.</strong> Add your{" "}
+          <code className="text-amber-200">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
+          <code className="text-amber-200">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to{" "}
+          <code className="text-amber-200">.env.local</code> to connect the database.
+        </div>
+      )}
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
         <p className="text-gray-500 text-sm text-center py-8">

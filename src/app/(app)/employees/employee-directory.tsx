@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -95,6 +94,7 @@ export function EmployeeDirectory({
   }
 
   async function handleSave() {
+    if (!supabase) { toast.error("Supabase not configured. Add credentials to .env.local."); return; }
     if (!form.name || !form.email) {
       toast.error("Name and email are required.");
       return;
@@ -155,6 +155,7 @@ export function EmployeeDirectory({
   }
 
   async function handleDelete(emp: Employee) {
+    if (!supabase) { toast.error("Supabase not configured."); return; }
     if (!confirm(`Remove ${emp.name} from the directory?`)) return;
 
     const { error } = await supabase
@@ -206,6 +207,7 @@ export function EmployeeDirectory({
   }
 
   async function handleCsvImport() {
+    if (!supabase) { toast.error("Supabase not configured. Add credentials to .env.local."); return; }
     if (!csvPreview) return;
     setCsvUploading(true);
 
