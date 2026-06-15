@@ -112,6 +112,7 @@ interface TrackModalProps {
 function TrackNewPostModal({ open, onClose, onAdd }: TrackModalProps) {
   const supabase = createClient();
   const [url, setUrl] = useState("");
+  const [title, setTitle] = useState("");
   const [saving, setSaving] = useState(false);
 
   const platform = url ? getPlatform(url) : null;
@@ -137,6 +138,7 @@ function TrackNewPostModal({ open, onClose, onAdd }: TrackModalProps) {
         .insert({
           org_id,
           linkedin_post_url: url.trim(),
+          title: title.trim() || null,
           status: "pending",
         })
         .select()
@@ -156,7 +158,7 @@ function TrackNewPostModal({ open, onClose, onAdd }: TrackModalProps) {
         org_id: "local",
         linkedin_post_url: url.trim(),
         linkedin_post_id: null,
-        title: null,
+        title: title.trim() || null,
         content_preview: null,
         published_at: null,
         last_synced_at: null,
@@ -172,12 +174,14 @@ function TrackNewPostModal({ open, onClose, onAdd }: TrackModalProps) {
     }
 
     setUrl("");
+    setTitle("");
     setSaving(false);
     onClose();
   }
 
   function handleClose() {
     setUrl("");
+    setTitle("");
     onClose();
   }
 
@@ -214,6 +218,17 @@ function TrackNewPostModal({ open, onClose, onAdd }: TrackModalProps) {
             )}
           </div>
 
+          <div className="space-y-1.5">
+            <Label className="text-gray-400 text-xs font-medium">
+              Title <span className="text-gray-600">(optional)</span>
+            </Label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. FarMart Q2 Announcement"
+              className="bg-[#111] border-white/10 text-white placeholder:text-gray-600 focus:border-emerald-500 h-9 text-sm"
+            />
+          </div>
         </div>
 
         <DialogFooter className="gap-2 pt-1">
@@ -262,6 +277,7 @@ export function PostTracking({
     const q = search.toLowerCase();
     const matchSearch =
       !q ||
+      (p.title ?? "").toLowerCase().includes(q) ||
       p.linkedin_post_url.toLowerCase().includes(q);
 
     const platform = getPlatform(p.linkedin_post_url);
@@ -455,8 +471,13 @@ export function PostTracking({
                         <PlatformBadge url={post.linkedin_post_url} />
                       </td>
 
-                      {/* URL */}
+                      {/* Title + URL */}
                       <td className="px-4 py-3 max-w-xs">
+                        <p className="font-medium text-white text-sm truncate">
+                          {post.title ?? (
+                            <span className="text-gray-500 italic">Untitled</span>
+                          )}
+                        </p>
                         <a
                           href={post.linkedin_post_url}
                           target="_blank"
