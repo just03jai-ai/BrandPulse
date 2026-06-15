@@ -658,13 +658,21 @@ export function EmployeeDirectory({
   const supabase = createClient();
   const isOnline = supabase !== null;
 
-  const [employees, setEmployees] = useState<EmployeeWithIG[]>(() => {
-    if (typeof window === "undefined") return initialEmployees;
+  const [employees, setEmployees] = useState<EmployeeWithIG[]>(initialEmployees);
+
+  // Merge localStorage-only employees after hydration to avoid SSR mismatch
+  useEffect(() => {
     const local = loadLocal();
     const serverEmails = new Set(initialEmployees.map((e) => e.email));
     const localOnly = local.filter((e) => !serverEmails.has(e.email));
-    return [...initialEmployees, ...localOnly];
-  });
+    if (localOnly.length > 0) {
+      setEmployees((prev) => {
+        const existEmails = new Set(prev.map((e) => e.email));
+        return [...prev, ...localOnly.filter((e) => !existEmails.has(e.email))];
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
