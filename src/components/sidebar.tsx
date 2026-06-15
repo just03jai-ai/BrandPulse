@@ -18,7 +18,7 @@ import { useRouter } from "next/navigation";
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart2 },
   { href: "/employees", label: "Employees", icon: Users },
-  { href: "/posts", label: "Posts", icon: FileText },
+  { href: "/posts", label: "Post Tracking", icon: FileText },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

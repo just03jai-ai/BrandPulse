@@ -1,50 +1,73 @@
 import { createClient } from "@/lib/supabase/server";
-import { BarChart2, Users, FileText, Trophy } from "lucide-react";
+import { DashboardClient } from "./dashboard-client";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const user = (await supabase?.auth.getUser())?.data.user ?? null;
+
+  const [employeesRes, engagementsRes, postsRes] = await Promise.all([
+    supabase?.from("employees").select("id, name, department, total_points, level"),
+    supabase?.from("engagements").select("engagement_type, points, created_at, employee_id"),
+    supabase?.from("posts").select("id, title, linkedin_post_url, total_likes, total_comments, total_shares, total_reposts, published_at, status").order("published_at", { ascending: false }).limit(4),
+  ]);
+
+  const employees = employeesRes?.data ?? [];
+  const engagements = engagementsRes?.data ?? [];
+  const posts = postsRes?.data ?? [];
+
+  const totalEmployees = employees.length;
+  const activeAdvocates = new Set(engagements.map((e) => e.employee_id).filter(Boolean)).size;
+  const participationRate = totalEmployees > 0 ? Math.round((activeAdvocates / totalEmployees) * 100) : 0;
+  const totalEngagements = engagements.length;
+  const totalLikes = engagements.filter((e) => e.engagement_type === "like").length;
+  const totalComments = engagements.filter((e) => e.engagement_type === "comment").length;
+  const totalShares = engagements.filter((e) => e.engagement_type === "share").length;
+  const totalReposts = engagements.filter((e) => e.engagement_type === "repost").length;
+
+  const topAdvocates = [...employees]
+    .sort((a, b) => b.total_points - a.total_points)
+    .slice(0, 5);
+
+  const depts = ["Marketing", "Sales", "Engineering", "Operations", "Design", "HR", "Finance"];
+  const deptActivity = depts
+    .map((dept) => ({
+      dept,
+      total: employees.filter((e) => e.department === dept).length,
+      active: employees.filter((e) => e.department === dept && e.total_points > 0).length,
+    }))
+    .filter((d) => d.total > 0);
+
+  const now = new Date();
+  const weeklyTrend = Array.from({ length: 8 }, (_, i) => {
+    const weekStart = new Date(now);
+    weekStart.setDate(weekStart.getDate() - (7 - i) * 7);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    const count = new Set(
+      engagements
+        .filter((e) => {
+          const d = new Date(e.created_at);
+          return d >= weekStart && d < weekEnd && e.employee_id;
+        })
+        .map((e) => e.employee_id)
+    ).size;
+    return { week: `Wk ${i + 1}`, advocates: count };
+  });
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
-        <p className="text-gray-400 mt-1 text-sm">
-          Welcome back{user?.email ? `, ${user.email}` : ""}
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {[
-          { label: "Total Employees", value: "—", icon: Users, color: "text-violet-400" },
-          { label: "Posts Tracked", value: "—", icon: FileText, color: "text-blue-400" },
-          { label: "Total Engagements", value: "—", icon: BarChart2, color: "text-emerald-400" },
-          { label: "Top Advocate", value: "—", icon: Trophy, color: "text-amber-400" },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-gray-400">{label}</span>
-              <Icon className={`w-4 h-4 ${color}`} />
-            </div>
-            <p className="text-2xl font-semibold text-white">{value}</p>
-          </div>
-        ))}
-      </div>
-
-      {!supabase && (
-        <div className="mb-4 bg-amber-950 border border-amber-800 rounded-xl p-4 text-sm text-amber-300">
-          <strong>Supabase not configured.</strong> Add your{" "}
-          <code className="text-amber-200">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
-          <code className="text-amber-200">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to{" "}
-          <code className="text-amber-200">.env.local</code> to connect the database.
-        </div>
-      )}
-
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-        <p className="text-gray-500 text-sm text-center py-8">
-          Add employees and posts to start tracking engagement.
-        </p>
-      </div>
-    </div>
+    <DashboardClient
+      totalEmployees={totalEmployees}
+      activeAdvocates={activeAdvocates}
+      participationRate={participationRate}
+      totalEngagements={totalEngagements}
+      totalLikes={totalLikes}
+      totalComments={totalComments}
+      totalShares={totalShares}
+      totalReposts={totalReposts}
+      topAdvocates={topAdvocates}
+      deptActivity={deptActivity}
+      weeklyTrend={weeklyTrend}
+      topPosts={posts}
+      isConnected={!!supabase}
+    />
   );
 }
