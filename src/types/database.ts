@@ -50,7 +50,7 @@ export interface PostRow {
   total_comments: number;
   total_shares: number;
   total_reposts: number;
-  status: "pending" | "syncing" | "synced" | "error";
+  status: "pending" | "syncing" | "synced" | "error" | "archived";
   created_at: string;
 }
 
