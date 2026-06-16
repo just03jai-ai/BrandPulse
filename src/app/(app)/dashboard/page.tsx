@@ -4,24 +4,45 @@ import { DashboardClient } from "./dashboard-client";
 export default async function DashboardPage() {
   const supabase = await createClient();
 
-  const [employeesRes, engagementsRes, postsRes] = await Promise.all([
+  // Only fetch engagements from last 8 weeks (for trend chart) — not all time
+  const eightWeeksAgo = new Date();
+  eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 56);
+
+  const [employeesRes, postsRes, trendRes] = await Promise.all([
     supabase?.from("employees").select("id, name, department, total_points, level"),
-    supabase?.from("engagements").select("engagement_type, points, created_at, employee_id"),
-    supabase?.from("posts").select("id, title, linkedin_post_url, total_likes, total_comments, total_shares, total_reposts, published_at, status").order("published_at", { ascending: false }).limit(4),
+    supabase
+      ?.from("posts")
+      .select("id, title, linkedin_post_url, total_likes, total_comments, total_shares, total_reposts, published_at, status")
+      .order("published_at", { ascending: false })
+      .limit(4),
+    // Only recent engagements needed for the weekly trend chart
+    supabase
+      ?.from("engagements")
+      .select("employee_id, created_at")
+      .gte("created_at", eightWeeksAgo.toISOString()),
   ]);
 
   const employees = employeesRes?.data ?? [];
-  const engagements = engagementsRes?.data ?? [];
   const posts = postsRes?.data ?? [];
+  const recentEngagements = trendRes?.data ?? [];
 
+  // Stats from denormalised employee data — no full table scan needed
   const totalEmployees = employees.length;
-  const activeAdvocates = new Set(engagements.map((e) => e.employee_id).filter(Boolean)).size;
-  const participationRate = totalEmployees > 0 ? Math.round((activeAdvocates / totalEmployees) * 100) : 0;
-  const totalEngagements = engagements.length;
-  const totalLikes = engagements.filter((e) => e.engagement_type === "like").length;
-  const totalComments = engagements.filter((e) => e.engagement_type === "comment").length;
-  const totalShares = engagements.filter((e) => e.engagement_type === "share").length;
-  const totalReposts = engagements.filter((e) => e.engagement_type === "repost").length;
+  const activeAdvocates = employees.filter((e) => e.total_points > 0).length;
+  const participationRate =
+    totalEmployees > 0 ? Math.round((activeAdvocates / totalEmployees) * 100) : 0;
+
+  // Totals from denormalised post columns — avoids fetching raw engagements
+  const { totalLikes, totalComments, totalShares, totalReposts } = posts.reduce(
+    (acc, p) => ({
+      totalLikes: acc.totalLikes + p.total_likes,
+      totalComments: acc.totalComments + p.total_comments,
+      totalShares: acc.totalShares + p.total_shares,
+      totalReposts: acc.totalReposts + p.total_reposts,
+    }),
+    { totalLikes: 0, totalComments: 0, totalShares: 0, totalReposts: 0 }
+  );
+  const totalEngagements = totalLikes + totalComments + totalShares + totalReposts;
 
   const topAdvocates = [...employees]
     .sort((a, b) => b.total_points - a.total_points)
@@ -36,6 +57,7 @@ export default async function DashboardPage() {
     }))
     .filter((d) => d.total > 0);
 
+  // Weekly trend from limited recent engagements only
   const now = new Date();
   const weeklyTrend = Array.from({ length: 8 }, (_, i) => {
     const weekStart = new Date(now);
@@ -43,7 +65,7 @@ export default async function DashboardPage() {
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 7);
     const count = new Set(
-      engagements
+      recentEngagements
         .filter((e) => {
           const d = new Date(e.created_at);
           return d >= weekStart && d < weekEnd && e.employee_id;
