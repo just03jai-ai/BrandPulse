@@ -403,16 +403,8 @@ export function PostTracking({
                   ? "No posts match your filters."
                   : showArchived
                   ? "No archived posts."
-                  : <>No posts tracked yet. Click &ldquo;Track New Post&rdquo; to get started.</>}
+                  : "No posts tracked yet."}
               </p>
-              {!search && platformFilter === "all" && !showArchived && (
-                <button
-                  onClick={() => setShowModal(true)}
-                  className="mt-4 flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg transition-colors mx-auto"
-                >
-                  <Plus className="w-4 h-4" /> Track New Post
-                </button>
-              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
