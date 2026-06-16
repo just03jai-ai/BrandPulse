@@ -4,6 +4,8 @@ import { useState, useMemo } from "react";
 import { Trophy } from "lucide-react";
 import { clsx } from "clsx";
 import type { Employee } from "@/types/database";
+import { DEPT_BADGE_STYLES } from "@/constants";
+import { avatarColor } from "@/lib/utils/format";
 
 type TimePeriod = "weekly" | "monthly" | "all-time";
 
@@ -15,28 +17,6 @@ interface LeaderboardEntry {
   reposts: number;
   score: number;
 }
-
-const AVATAR_PALETTE = [
-  "#6366f1", "#8b5cf6", "#ec4899", "#ef4444",
-  "#f97316", "#eab308", "#22c55e", "#14b8a6",
-  "#3b82f6", "#06b6d4",
-];
-
-function avatarColor(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h << 5) - h + name.charCodeAt(i);
-  return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
-}
-
-const DEPT_STYLES: Record<string, string> = {
-  Design: "bg-purple-900/40 text-purple-300 border border-purple-700/30",
-  Marketing: "bg-pink-900/40 text-pink-300 border border-pink-700/30",
-  Sales: "bg-blue-900/40 text-blue-300 border border-blue-700/30",
-  Engineering: "bg-cyan-900/40 text-cyan-300 border border-cyan-700/30",
-  HR: "bg-violet-900/40 text-violet-300 border border-violet-700/30",
-  Operations: "bg-orange-900/40 text-orange-300 border border-orange-700/30",
-  Finance: "bg-yellow-900/40 text-yellow-300 border border-yellow-700/30",
-};
 
 const RANK_STYLES: Record<number, string> = {
   1: "bg-emerald-900/50 text-emerald-300 border border-emerald-700/30",
@@ -68,7 +48,7 @@ function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg"
 function DeptBadge({ dept }: { dept: string | null }) {
   if (!dept) return <span className="text-gray-600 text-xs">—</span>;
   return (
-    <span className={clsx("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", DEPT_STYLES[dept] ?? "bg-gray-800 text-gray-400 border border-gray-700/30")}>
+    <span className={clsx("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", DEPT_BADGE_STYLES[dept] ?? "bg-gray-800 text-gray-400 border border-gray-700/30")}>
       {dept}
     </span>
   );
@@ -108,13 +88,11 @@ export function LeaderboardClient({ employees, engagementMap }: Props) {
 
   return (
     <div className="flex flex-col min-h-screen bg-[#0c0e15]">
-      {/* Header */}
       <div className="px-8 pt-8 pb-0">
         <h1 className="text-3xl font-bold text-white">Leaderboard</h1>
         <p className="text-gray-500 text-sm mt-1">Top employee advocates ranked by advocacy score</p>
       </div>
 
-      {/* Top 3 Podium */}
       {top3.length > 0 && (
         <div className="px-8 pt-6">
           <div className="bg-[#12151f] border border-white/5 rounded-xl p-6">
@@ -143,7 +121,6 @@ export function LeaderboardClient({ employees, engagementMap }: Props) {
         </div>
       )}
 
-      {/* Filters */}
       <div className="px-8 pt-5 space-y-3">
         <div className="flex items-center gap-2">
           {(["weekly", "monthly", "all-time"] as TimePeriod[]).map((t) => (
@@ -180,7 +157,6 @@ export function LeaderboardClient({ employees, engagementMap }: Props) {
         </div>
       </div>
 
-      {/* Table */}
       <div className="px-8 pt-5 pb-4 flex-1">
         <div className="bg-[#12151f] border border-white/5 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
@@ -242,7 +218,6 @@ export function LeaderboardClient({ employees, engagementMap }: Props) {
           </table>
         </div>
 
-        {/* Scoring key */}
         <div className="mt-4 flex items-center gap-6 text-xs text-gray-600">
           <span>Scoring:</span>
           <span>👍 Like = 1 pt</span>

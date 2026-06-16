@@ -30,22 +30,9 @@ import {
 import type { Post } from "@/types/database";
 import { clsx } from "clsx";
 
+import { getPlatform, formatDate } from "@/lib/utils/format";
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function getPlatform(url: string): "linkedin" | "instagram" | "unknown" {
-  if (url.includes("linkedin.com")) return "linkedin";
-  if (url.includes("instagram.com")) return "instagram";
-  return "unknown";
-}
-
-function formatDate(iso: string | null) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
 function totalEngagements(post: Post) {
   return post.total_likes + post.total_comments + post.total_shares + post.total_reposts;

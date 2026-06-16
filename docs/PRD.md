@@ -12,13 +12,57 @@ BrandPulse gives companies real-time visibility into how employees engage with o
 
 ## 2. Problem Statement
 
-Companies invest heavily in content marketing but have no way to:
-- Know which employees are sharing, liking, or commenting on company posts
-- Measure the compounding reach employees generate
-- Motivate employees to participate consistently
-- Identify top advocates for recognition or reward
+### 2.1 The Advocacy Gap
 
-HR and Marketing teams resort to manual tracking in spreadsheets, which is error-prone, delayed, and unscalable.
+Employee advocacy is one of the highest-ROI channels available to B2B companies — content shared by employees generates 8× more engagement than content shared by brand accounts, and people are 16× more likely to read a post from a peer than from a company page. Yet most organizations have no systematic way to activate, track, or reward it.
+
+The result: companies invest thousands of dollars producing LinkedIn content that their own employees scroll past.
+
+### 2.2 The Tracking Problem
+
+When marketing or HR teams do try to run employee advocacy programs, they hit an immediate operational wall:
+
+- **No visibility:** There is no native way inside LinkedIn or Instagram to see which employees engaged with a specific company post. Platform analytics only show aggregate reach — not who drove it.
+- **Manual and error-prone:** Teams resort to asking employees to self-report ("Did you share the post?"), or manually scanning comments sections. This data is incomplete, biased, and arrives days too late to act on.
+- **No historical record:** Spreadsheet-based tracking resets with every campaign. There is no cumulative score, no trend data, and no way to identify who your top advocates are over time.
+- **Unscalable:** A company with 500 employees running 4 campaigns per month would need to manually check thousands of data points weekly. No marketing team has the bandwidth.
+
+### 2.3 The Motivation Problem
+
+Even employees who want to participate don't, because the path of least resistance is to do nothing:
+
+- There is no feed of company-approved posts to engage with — employees have to go find them.
+- There is no recognition for participation — advocacy feels invisible and thankless.
+- There are no stakes — whether an employee shares 10 posts or zero, nothing changes for them.
+- There is no social proof — employees don't know how their colleagues are participating, so there's no peer pressure or competition to trigger action.
+
+### 2.4 The Measurement Problem
+
+Executives and marketing leaders are asked to justify advocacy program budgets without reliable data:
+
+- No way to attribute pipeline or reach back to specific employees or campaigns.
+- No participation rate metric — only anecdotal evidence that "some employees are sharing."
+- No department-level breakdown — it's impossible to identify which teams are engaged and which are dead weight.
+- No ROI calculation — without estimated reach data, the business case for investing in the program can't be made.
+
+### 2.5 Current Workarounds and Why They Fail
+
+| Workaround | Why It Fails |
+|---|---|
+| Google Sheets / manual tracking | Requires hours of manual effort per campaign; data is stale by the time it's compiled |
+| Email reminders to employees | No accountability, no tracking, low response rate |
+| LinkedIn's native analytics | Shows brand page performance only — zero employee-level data |
+| Generic gamification platforms | Not built for LinkedIn/Instagram advocacy; no API integration; expensive and over-engineered |
+| Social media management tools (Hootsuite, Sprinklr) | Focused on publishing and scheduling, not employee participation tracking |
+
+### 2.6 Who Feels This Pain
+
+| Stakeholder | Pain |
+|---|---|
+| **Marketing Manager** | Can't prove that employee advocacy programs work; spends hours chasing participation data manually |
+| **HR Manager** | Wants to recognize top advocates but has no reliable data to identify them |
+| **Executive / CMO** | Can't tie brand content investment to measurable reach or pipeline impact |
+| **Employee** | Doesn't know what to share, when, or why — participation feels pointless without recognition |
 
 ---
 

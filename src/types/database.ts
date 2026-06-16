@@ -143,9 +143,5 @@ export function getLevel(points: number): EmployeeLevel {
   return "Newcomer";
 }
 
-export const POINTS_MAP = {
-  like: 1,
-  comment: 1.5,
-  share: 2,
-  repost: 3,
-} as const;
+// Re-exported from @/constants for backwards compatibility
+export { POINTS_MAP } from "@/constants";

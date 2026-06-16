@@ -2,19 +2,11 @@
 
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Cell,
+  BarChart, Bar,
 } from "recharts";
 import { Users, UserCheck, TrendingUp, Zap, ThumbsUp, MessageSquare, Share2, Repeat2 } from "lucide-react";
 
-const DEPT_COLORS: Record<string, string> = {
-  Marketing: "#22c55e",
-  Sales: "#3b82f6",
-  Engineering: "#f97316",
-  Operations: "#a855f7",
-  Design: "#ec4899",
-  HR: "#10b981",
-  Finance: "#8b5cf6",
-};
+import { DEPT_CHART_COLORS } from "@/constants";
 
 interface TopEmployee {
   id: string;
@@ -161,11 +153,17 @@ export function DashboardClient({
                   contentStyle={{ background: "#1f1f1f", border: "1px solid #333", borderRadius: 8, fontSize: 12 }}
                   labelStyle={{ color: "#9ca3af" }}
                 />
-                <Bar dataKey="active" name="Active" radius={[0, 4, 4, 0]}>
-                  {deptActivity.map((d) => (
-                    <Cell key={d.dept} fill={DEPT_COLORS[d.dept] ?? "#6b7280"} />
-                  ))}
-                </Bar>
+                <Bar
+                  dataKey="active"
+                  name="Active"
+                  radius={[0, 4, 4, 0]}
+                  fill="#22c55e"
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  shape={(props: any) => {
+                    const color = DEPT_CHART_COLORS[props.payload?.dept] ?? "#6b7280";
+                    return <rect x={props.x} y={props.y} width={props.width} height={Math.max(props.height, 0)} fill={color} rx={4} />;
+                  }}
+                />
               </BarChart>
             </ResponsiveContainer>
           )}
