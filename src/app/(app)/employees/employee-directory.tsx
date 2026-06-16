@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -122,6 +123,19 @@ function getInitials(name: string) {
     .slice(0, 2)
     .join("")
     .toUpperCase();
+}
+
+function formFromEmployee(editing: EmployeeWithIG | null): EmployeeFormData {
+  return editing
+    ? {
+        name: editing.name,
+        email: editing.email,
+        department: editing.department ?? "",
+        title: editing.title ?? "",
+        linkedin_url: editing.linkedin_url ?? "",
+        instagram_handle: editing.instagram_handle ?? "",
+      }
+    : EMPTY_FORM;
 }
 
 // ── CSV Upload Modal ──────────────────────────────────────────────────────────
@@ -389,25 +403,8 @@ interface FormModalProps {
 }
 
 function EmployeeFormModal({ open, onClose, editing, onSave }: FormModalProps) {
-  const [form, setForm] = useState<EmployeeFormData>(EMPTY_FORM);
+  const [form, setForm] = useState<EmployeeFormData>(() => formFromEmployee(editing));
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      setForm(
-        editing
-          ? {
-              name: editing.name,
-              email: editing.email,
-              department: editing.department ?? "",
-              title: editing.title ?? "",
-              linkedin_url: editing.linkedin_url ?? "",
-              instagram_handle: editing.instagram_handle ?? "",
-            }
-          : EMPTY_FORM
-      );
-    }
-  }, [editing, open]);
 
   async function handleSubmit() {
     if (!form.name.trim() || !form.email.trim()) {
@@ -698,22 +695,26 @@ export function EmployeeDirectory({
 }) {
   const supabase = createClient();
   const isOnline = supabase !== null;
+  const router = useRouter();
 
   const [employees, setEmployees] = useState<EmployeeWithIG[]>(initialEmployees);
 
-  // Merge localStorage-only employees after hydration to avoid SSR mismatch
+  // Merge localStorage-only employees after hydration to avoid SSR mismatch.
   useEffect(() => {
-    const local = loadLocal();
-    const serverEmails = new Set(initialEmployees.map((e) => e.email));
-    const localOnly = local.filter((e) => !serverEmails.has(e.email));
-    if (localOnly.length > 0) {
+    const timeout = window.setTimeout(() => {
+      const local = loadLocal();
+      const serverEmails = new Set(initialEmployees.map((e) => e.email));
+      const localOnly = local.filter((e) => !serverEmails.has(e.email));
+      if (localOnly.length === 0) return;
+
       setEmployees((prev) => {
         const existEmails = new Set(prev.map((e) => e.email));
         return [...prev, ...localOnly.filter((e) => !existEmails.has(e.email))];
       });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
+  }, [initialEmployees]);
 
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
@@ -739,6 +740,30 @@ export function EmployeeDirectory({
 
   const existingEmails = new Set(employees.map((e) => e.email));
   const localCount = employees.filter((e) => e.org_id === "local").length;
+
+  async function ensureOrg(userId: string): Promise<string> {
+    const { data: existing } = await supabase!
+      .from("organizations")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle();
+    if (existing) return existing.id;
+
+    const { error } = await supabase!
+      .from("organizations")
+      .insert({
+        id: userId,
+        name: "My Organization",
+        slug: userId,
+        linkedin_org_id: null,
+        instagram_account_id: null,
+        linkedin_access_token: null,
+        instagram_access_token: null,
+      });
+
+    if (error && !error.message.includes("duplicate")) throw new Error(error.message);
+    return userId;
+  }
 
   async function handleSave(form: EmployeeFormData) {
     if (supabase) {
@@ -773,7 +798,7 @@ export function EmployeeDirectory({
 
       if (!editingEmployee) {
         const { data: { user } } = await supabase.auth.getUser();
-        const org_id = user!.id;
+        const org_id = await ensureOrg(user!.id);
         const { data, error } = await supabase
           .from("employees")
           .insert({
@@ -842,7 +867,15 @@ export function EmployeeDirectory({
     if (supabase) {
       const { data: { user } } = await supabase.auth.getUser();
       const org_id = user!.id;
-      const toInsert = rows.map((r) => ({
+
+      // Only insert rows whose email isn't already in the directory
+      const newRows = rows.filter((r) => !existingEmails.has(r.email));
+      if (newRows.length === 0) {
+        toast.success("No new employees to import — all emails already exist.");
+        return;
+      }
+
+      const toInsert = newRows.map((r) => ({
         org_id,
         name: r.name,
         email: r.email,
@@ -851,21 +884,23 @@ export function EmployeeDirectory({
         linkedin_url: r.linkedin_url || null,
         is_active: true,
       }));
+
       const { data, error } = await supabase
         .from("employees")
-        .upsert(toInsert, { onConflict: "org_id,email" })
+        .insert(toInsert)
         .select();
 
-      if (error) { toast.error(error.message); return; }
+      if (error) {
+        toast.error(`Import failed: ${error.message}`);
+        return;
+      }
 
       const imported = (data ?? []).map((d, i) => ({
         ...d,
-        instagram_handle: rows[i]?.instagram_handle || null,
+        instagram_handle: newRows[i]?.instagram_handle || null,
       }));
-      setEmployees((prev) => {
-        const importedEmails = new Set(imported.map((i) => i.email));
-        return [...imported, ...prev.filter((e) => !importedEmails.has(e.email))];
-      });
+      setEmployees((prev) => [...imported, ...prev]);
+      router.refresh();
     } else {
       // Offline
       const emailMap = new Map(employees.map((e) => [e.email, e]));
@@ -981,25 +1016,6 @@ export function EmployeeDirectory({
                   ? "No employees match your filters."
                   : "No employees yet. Add your first employee or import a CSV."}
               </p>
-              {!search && !deptFilter && (
-                <div className="mt-5 flex items-center justify-center gap-2">
-                  <button
-                    onClick={() => setShowCsvModal(true)}
-                    className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white px-3 py-2 border border-white/10 rounded-lg transition-colors"
-                  >
-                    <Upload className="w-4 h-4" /> Import CSV
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditingEmployee(null);
-                      setShowAddModal(true);
-                    }}
-                    className="flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg transition-colors"
-                  >
-                    <UserPlus className="w-4 h-4" /> Add Employee
-                  </button>
-                </div>
-              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -1201,6 +1217,7 @@ export function EmployeeDirectory({
 
       {/* Modals */}
       <EmployeeFormModal
+        key={editingEmployee?.id ?? "new"}
         open={showAddModal}
         onClose={() => {
           setShowAddModal(false);

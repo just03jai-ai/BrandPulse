@@ -1,13 +1,42 @@
-export default function LeaderboardPage() {
+import { createClient } from "@/lib/supabase/server";
+import { LeaderboardClient } from "./leaderboard-client";
+
+export default async function LeaderboardPage() {
+  const supabase = await createClient();
+
+  const { data: employees } = await (
+    supabase
+      ?.from("employees")
+      .select("*")
+      .eq("is_active", true)
+      .order("total_points", { ascending: false }) ??
+    Promise.resolve({ data: [] })
+  );
+
+  const { data: engagements } = await (
+    supabase
+      ?.from("engagements")
+      .select("employee_id, engagement_type") ??
+    Promise.resolve({ data: [] })
+  );
+
+  const engagementMap: Record<string, { likes: number; comments: number; shares: number; reposts: number }> = {};
+  for (const eng of engagements ?? []) {
+    if (!eng.employee_id) continue;
+    if (!engagementMap[eng.employee_id]) {
+      engagementMap[eng.employee_id] = { likes: 0, comments: 0, shares: 0, reposts: 0 };
+    }
+    const m = engagementMap[eng.employee_id];
+    if (eng.engagement_type === "like") m.likes++;
+    else if (eng.engagement_type === "comment") m.comments++;
+    else if (eng.engagement_type === "share") m.shares++;
+    else if (eng.engagement_type === "repost") m.reposts++;
+  }
+
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-white">Leaderboard</h1>
-        <p className="text-gray-400 mt-1 text-sm">Top employee advocates ranked by points.</p>
-      </div>
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
-        <p className="text-gray-500 text-sm">Coming in Week 3 — add employees and sync posts first.</p>
-      </div>
-    </div>
+    <LeaderboardClient
+      employees={employees ?? []}
+      engagementMap={engagementMap}
+    />
   );
 }
