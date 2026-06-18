@@ -48,28 +48,27 @@ export const DEPT_CHART_COLORS: Record<string, string> = {
 // ─── Levels ───────────────────────────────────────────────────────────────────
 
 export const LEVEL_COLORS: Record<string, string> = {
-  Newcomer: "bg-gray-800 text-gray-400",
-  "Rising Star": "bg-amber-900/60 text-amber-300",
-  Champion: "bg-blue-900/60 text-blue-300",
-  Legend: "bg-yellow-900/60 text-yellow-300",
-  Ambassador: "bg-violet-900/60 text-violet-300",
+  Bronze:   "bg-gray-800 text-gray-400",
+  Silver:   "bg-blue-900/60 text-blue-300",
+  Gold:     "bg-yellow-900/60 text-yellow-300",
+  Platinum: "bg-violet-900/60 text-violet-300",
 };
 
 export const LEVEL_THRESHOLDS = {
-  Ambassador: 1000,
-  Legend: 500,
-  Champion: 200,
-  "Rising Star": 50,
-  Newcomer: 0,
+  Platinum: 1000,
+  Gold:     500,
+  Silver:   100,
+  Bronze:   0,
 } as const;
 
 // ─── Scoring ──────────────────────────────────────────────────────────────────
 
 export const POINTS_MAP = {
-  like: 1,
-  comment: 1.5,
-  share: 2,
-  repost: 3,
+  like:    1,
+  comment: 3,
+  share:   5,
+  repost:  5,
+  mention: 2,
 } as const;
 
 export type EngagementType = keyof typeof POINTS_MAP;
@@ -89,6 +88,3 @@ export const AVATAR_PALETTE = [
   "#06b6d4",
 ] as const;
 
-// ─── Storage ──────────────────────────────────────────────────────────────────
-
-export const STORAGE_KEY = "brandpulse_employees";

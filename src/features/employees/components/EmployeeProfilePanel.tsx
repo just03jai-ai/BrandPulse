@@ -26,7 +26,7 @@ export function EmployeeProfilePanel({ employee, onClose, supabase }: Props) {
   useEffect(() => {
     if (!supabase) return;
     supabase
-      .from("engagements")
+      .from("engagement_events")
       .select("engagement_type")
       .eq("employee_id", employee.id)
       .then(({ data }) => {

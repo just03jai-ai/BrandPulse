@@ -282,3 +282,150 @@ create policy "Dev: authed user can manage employees using uid as org_id"
   on employees for all
   using (org_id::text = auth.uid()::text)
   with check (org_id::text = auth.uid()::text);
+
+-- ─────────────────────────────────────────────
+-- EMPLOYEE CONSENT & LOCATION FIELDS
+-- ─────────────────────────────────────────────
+alter table employees add column if not exists location text;
+alter table employees add column if not exists consent_status boolean not null default false;
+alter table employees add column if not exists consent_at timestamptz;
+
+-- ─────────────────────────────────────────────
+-- CAMPAIGNS
+-- ─────────────────────────────────────────────
+create table if not exists campaigns (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references organizations(id) on delete cascade,
+  name text not null,
+  description text,
+  hashtag text,
+  start_date date,
+  end_date date,
+  status text not null default 'active' check (status in ('draft', 'active', 'completed', 'archived')),
+  created_at timestamptz default now() not null,
+  updated_at timestamptz default now() not null
+);
+
+alter table campaigns enable row level security;
+
+create policy "Org members can read campaigns"
+  on campaigns for select to authenticated
+  using (is_org_member(org_id));
+
+create policy "Admins can manage campaigns"
+  on campaigns for all to authenticated
+  using (
+    exists (
+      select 1 from org_members m
+      where m.org_id = campaigns.org_id
+        and m.user_id = auth.uid()
+        and m.role in ('owner', 'admin')
+    )
+  );
+
+create trigger campaigns_updated_at
+  before update on campaigns
+  for each row execute function update_updated_at();
+
+-- ─────────────────────────────────────────────
+-- CAMPAIGN ↔ POSTS JUNCTION
+-- ─────────────────────────────────────────────
+create table if not exists campaign_posts (
+  campaign_id uuid not null references campaigns(id) on delete cascade,
+  post_id uuid not null references posts(id) on delete cascade,
+  added_at timestamptz default now() not null,
+  primary key (campaign_id, post_id)
+);
+
+alter table campaign_posts enable row level security;
+
+create policy "Org members can read campaign_posts"
+  on campaign_posts for select to authenticated
+  using (
+    exists (
+      select 1 from campaigns c
+      where c.id = campaign_posts.campaign_id
+        and is_org_member(c.org_id)
+    )
+  );
+
+create policy "Admins can manage campaign_posts"
+  on campaign_posts for all to authenticated
+  using (
+    exists (
+      select 1 from campaigns c
+      join org_members m on m.org_id = c.org_id
+      where c.id = campaign_posts.campaign_id
+        and m.user_id = auth.uid()
+        and m.role in ('owner', 'admin')
+    )
+  );
+
+-- ─────────────────────────────────────────────
+-- MANUAL SUBMISSIONS (employee proof + marketing review)
+-- ─────────────────────────────────────────────
+create table if not exists manual_submissions (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references organizations(id) on delete cascade,
+  employee_id uuid not null references employees(id) on delete cascade,
+  campaign_id uuid references campaigns(id) on delete set null,
+  post_url text,
+  screenshot_url text,
+  notes text,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  points_awarded numeric not null default 15,
+  reviewer_notes text,
+  reviewed_at timestamptz,
+  reviewed_by uuid references auth.users(id),
+  created_at timestamptz default now() not null
+);
+
+alter table manual_submissions enable row level security;
+
+create policy "Org members can read submissions"
+  on manual_submissions for select to authenticated
+  using (is_org_member(org_id));
+
+create policy "Org members can create submissions"
+  on manual_submissions for insert to authenticated
+  with check (is_org_member(org_id));
+
+create policy "Admins can manage submissions"
+  on manual_submissions for all to authenticated
+  using (
+    exists (
+      select 1 from org_members m
+      where m.org_id = manual_submissions.org_id
+        and m.user_id = auth.uid()
+        and m.role in ('owner', 'admin')
+    )
+  );
+
+-- ─────────────────────────────────────────────
+-- SCORING RULES (per-org configurable)
+-- ─────────────────────────────────────────────
+create table if not exists scoring_rules (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references organizations(id) on delete cascade,
+  action text not null,
+  points numeric not null default 0,
+  updated_at timestamptz default now() not null,
+  unique(org_id, action)
+);
+
+alter table scoring_rules enable row level security;
+
+create policy "Org members can read scoring rules"
+  on scoring_rules for select to authenticated
+  using (is_org_member(org_id));
+
+create policy "Admins can manage scoring rules"
+  on scoring_rules for all to authenticated
+  using (
+    exists (
+      select 1 from org_members m
+      where m.org_id = scoring_rules.org_id
+        and m.user_id = auth.uid()
+        and m.role in ('owner', 'admin')
+    )
+  );

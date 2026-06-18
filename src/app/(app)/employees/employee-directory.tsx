@@ -1,16 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { UserPlus, Upload, Search, Pencil, Trash2, Link2, Camera, Database, Users } from "lucide-react";
+import { UserPlus, Upload, Search, Pencil, Trash2, Link2, Camera, Users } from "lucide-react";
 import { clsx } from "clsx";
 import { DEPARTMENTS, DEPT_COLORS, LEVEL_COLORS } from "@/constants";
 import { getInitials, getIgHandle } from "@/lib/utils/format";
 import { CsvImportModal, EmployeeFormModal, EmployeeProfilePanel } from "@/features/employees/components";
-import { loadLocal, saveLocal, makeLocalEmployee } from "@/features/employees/utils";
 import type { EmployeeFormData, EmployeeWithIG } from "@/features/employees/types";
 import type { Employee } from "@/types/database";
 
@@ -22,36 +21,15 @@ export function EmployeeDirectory({
   error?: string;
 }) {
   const supabase = createClient();
-  const isOnline = supabase !== null;
   const router = useRouter();
 
   const [employees, setEmployees] = useState<EmployeeWithIG[]>(initialEmployees);
-
-  // Merge localStorage-only employees after hydration to avoid SSR mismatch.
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      const local = loadLocal();
-      const serverEmails = new Set(initialEmployees.map((e) => e.email));
-      const localOnly = local.filter((e) => !serverEmails.has(e.email));
-      if (localOnly.length === 0) return;
-      setEmployees((prev) => {
-        const existEmails = new Set(prev.map((e) => e.email));
-        return [...prev, ...localOnly.filter((e) => !existEmails.has(e.email))];
-      });
-    }, 0);
-    return () => window.clearTimeout(timeout);
-  }, [initialEmployees]);
-
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeWithIG | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeWithIG | null>(null);
   const [showCsvModal, setShowCsvModal] = useState(false);
-
-  useEffect(() => {
-    saveLocal(employees.filter((e) => e.org_id === "local"));
-  }, [employees]);
 
   const filtered = employees.filter((e) => {
     const q = search.toLowerCase();
@@ -65,10 +43,8 @@ export function EmployeeDirectory({
   });
 
   const existingEmails = new Set(employees.map((e) => e.email));
-  const localCount = employees.filter((e) => e.org_id === "local").length;
 
   async function ensureOrg(userId: string): Promise<string> {
-    // org ID ≠ user ID — look up via org_members join table
     const { data: membership } = await supabase!
       .from("org_members")
       .select("org_id")
@@ -76,7 +52,6 @@ export function EmployeeDirectory({
       .maybeSingle();
     if (membership?.org_id) return membership.org_id;
 
-    // First time: create org, then add user as owner
     const { data: org, error: orgError } = await supabase!
       .from("organizations")
       .insert({ name: "My Organization", slug: `org-${userId.slice(0, 8)}` })
@@ -93,64 +68,48 @@ export function EmployeeDirectory({
   }
 
   async function handleSave(form: EmployeeFormData) {
-    if (supabase) {
-      if (editingEmployee && editingEmployee.org_id !== "local") {
-        const { data, error } = await supabase
-          .from("employees")
-          .update({
-            name: form.name,
-            email: form.email,
-            department: form.department || null,
-            title: form.title || null,
-            linkedin_url: form.linkedin_url || null,
-            is_active: true,
-          })
-          .eq("id", editingEmployee.id)
-          .select()
-          .single();
-        if (error) { toast.error(error.message); return; }
-        setEmployees((prev) =>
-          prev.map((e) =>
-            e.id === editingEmployee.id
-              ? { ...data, instagram_handle: form.instagram_handle || null }
-              : e
-          )
-        );
-        toast.success("Employee updated.");
-      } else if (!editingEmployee) {
-        const { data: { user } } = await supabase.auth.getUser();
-        const org_id = await ensureOrg(user!.id);
-        const { data, error } = await supabase
-          .from("employees")
-          .insert({
-            org_id,
-            name: form.name,
-            email: form.email,
-            department: form.department || null,
-            title: form.title || null,
-            linkedin_url: form.linkedin_url || null,
-            is_active: true,
-          })
-          .select()
-          .single();
-        if (error) { toast.error(error.message); return; }
-        setEmployees((prev) => [{ ...data, instagram_handle: form.instagram_handle || null }, ...prev]);
-        toast.success("Employee added.");
-      }
+    if (!supabase) {
+      toast.error("Supabase is not configured.");
+      return;
+    }
+    if (editingEmployee) {
+      const { data, error } = await supabase
+        .from("employees")
+        .update({
+          name: form.name,
+          email: form.email,
+          department: form.department || null,
+          title: form.title || null,
+          linkedin_url: form.linkedin_url || null,
+          instagram_handle: form.instagram_handle || null,
+          is_active: true,
+        })
+        .eq("id", editingEmployee.id)
+        .select()
+        .single();
+      if (error) { toast.error(error.message); return; }
+      setEmployees((prev) => prev.map((e) => e.id === editingEmployee.id ? data : e));
+      toast.success("Employee updated.");
     } else {
-      if (editingEmployee) {
-        setEmployees((prev) =>
-          prev.map((e) =>
-            e.id === editingEmployee.id
-              ? { ...e, ...form, department: form.department || null, title: form.title || null, linkedin_url: form.linkedin_url || null, instagram_handle: form.instagram_handle || null, updated_at: new Date().toISOString() }
-              : e
-          )
-        );
-        toast.success("Employee updated (saved locally).");
-      } else {
-        setEmployees((prev) => [makeLocalEmployee(form), ...prev]);
-        toast.success("Employee added (saved locally).");
-      }
+      const { data: { user } } = await supabase.auth.getUser();
+      const org_id = await ensureOrg(user!.id);
+      const { data, error } = await supabase
+        .from("employees")
+        .insert({
+          org_id,
+          name: form.name,
+          email: form.email,
+          department: form.department || null,
+          title: form.title || null,
+          linkedin_url: form.linkedin_url || null,
+          instagram_handle: form.instagram_handle || null,
+          is_active: true,
+        })
+        .select()
+        .single();
+      if (error) { toast.error(error.message); return; }
+      setEmployees((prev) => [data, ...prev]);
+      toast.success("Employee added.");
     }
     setShowAddModal(false);
     setEditingEmployee(null);
@@ -158,68 +117,39 @@ export function EmployeeDirectory({
 
   async function handleDelete(emp: EmployeeWithIG) {
     if (!confirm(`Remove ${emp.name} from the directory?`)) return;
-    if (supabase && emp.org_id !== "local") {
-      const { error } = await supabase.from("employees").delete().eq("id", emp.id);
-      if (error) { toast.error(error.message); return; }
-    }
+    if (!supabase) { toast.error("Supabase is not configured."); return; }
+    const { error } = await supabase.from("employees").delete().eq("id", emp.id);
+    if (error) { toast.error(error.message); return; }
     setEmployees((prev) => prev.filter((e) => e.id !== emp.id));
     if (selectedEmployee?.id === emp.id) setSelectedEmployee(null);
     toast.success("Employee removed.");
   }
 
   async function handleCsvImport(rows: EmployeeFormData[]): Promise<{ added: number; skipped: number }> {
+    if (!supabase) throw new Error("Supabase is not configured.");
     const skipped = rows.filter((r) => existingEmails.has(r.email)).length;
+    const newRows = rows.filter((r) => !existingEmails.has(r.email));
+    if (newRows.length === 0) return { added: 0, skipped };
 
-    if (supabase) {
-      const { data: { user } } = await supabase.auth.getUser();
-      const org_id = await ensureOrg(user!.id);
-      const newRows = rows.filter((r) => !existingEmails.has(r.email));
-      if (newRows.length === 0) {
-        return { added: 0, skipped };
-      }
-      const { data, error } = await supabase
-        .from("employees")
-        .insert(newRows.map((r) => ({
-          org_id,
-          name: r.name,
-          email: r.email,
-          department: r.department || null,
-          title: r.title || null,
-          linkedin_url: r.linkedin_url || null,
-          is_active: true,
-        })))
-        .select();
-      if (error) throw new Error(error.message);
-      const imported = (data ?? []).map((d, i) => ({
-        ...d,
-        instagram_handle: newRows[i]?.instagram_handle || null,
-      }));
-      setEmployees((prev) => [...imported, ...prev]);
-      router.refresh();
-      return { added: imported.length, skipped };
-    } else {
-      const emailMap = new Map(employees.map((e) => [e.email, e]));
-      const newEmps: EmployeeWithIG[] = [];
-      const updatedMap = new Map(employees.map((e) => [e.id, e]));
-      for (const row of rows) {
-        const existing = emailMap.get(row.email);
-        if (existing) {
-          updatedMap.set(existing.id, {
-            ...existing,
-            name: row.name,
-            department: row.department || existing.department,
-            title: row.title || existing.title,
-            linkedin_url: row.linkedin_url || existing.linkedin_url,
-            instagram_handle: row.instagram_handle || existing.instagram_handle,
-            updated_at: new Date().toISOString(),
-          });
-        } else {
-          newEmps.push(makeLocalEmployee(row));
-        }
-      }
-      setEmployees([...newEmps, ...Array.from(updatedMap.values())]);
-      return { added: newEmps.length, skipped };
-    }
+    const { data: { user } } = await supabase.auth.getUser();
+    const org_id = await ensureOrg(user!.id);
+    const { data, error } = await supabase
+      .from("employees")
+      .insert(newRows.map((r) => ({
+        org_id,
+        name: r.name,
+        email: r.email,
+        department: r.department || null,
+        title: r.title || null,
+        linkedin_url: r.linkedin_url || null,
+        instagram_handle: r.instagram_handle || null,
+        is_active: true,
+      })))
+      .select();
+    if (error) throw new Error(error.message);
+    setEmployees((prev) => [...(data ?? []), ...prev]);
+    router.refresh();
+    return { added: (data ?? []).length, skipped };
   }
 
   if (error) {
@@ -235,9 +165,6 @@ export function EmployeeDirectory({
             <h1 className="text-3xl font-bold text-white">Employee Directory</h1>
             <p className="text-gray-500 text-sm mt-1">
               {employees.length} {employees.length === 1 ? "employee" : "employees"} in directory
-              {localCount > 0 && !isOnline && (
-                <span className="text-amber-400 ml-2">· {localCount} saved locally</span>
-              )}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -257,16 +184,6 @@ export function EmployeeDirectory({
             </button>
           </div>
         </div>
-
-        {!isOnline && (
-          <div className="mt-4 flex items-start gap-2.5 bg-amber-950/50 border border-amber-800/40 rounded-xl px-4 py-3 text-sm text-amber-300">
-            <Database className="w-4 h-4 mt-0.5 flex-shrink-0" />
-            <span>
-              Supabase not connected — data is saved locally in your browser. Add credentials
-              to <code className="text-amber-200">.env.local</code> to persist to the database.
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Filters */}
@@ -297,7 +214,6 @@ export function EmployeeDirectory({
         <div className="flex-1 bg-[#1a1a1a] border border-white/5 rounded-xl overflow-hidden min-w-0">
           {filtered.length === 0 ? (
             search || deptFilter ? (
-              /* No search results */
               <div className="flex flex-col items-center justify-center py-24 text-center">
                 <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
                   <Search className="w-6 h-6 text-gray-500" />
@@ -314,9 +230,7 @@ export function EmployeeDirectory({
                 </button>
               </div>
             ) : (
-              /* Truly empty — no employees at all */
               <div className="flex flex-col items-center justify-center py-24 text-center px-8">
-                {/* Illustration */}
                 <div className="relative mb-6">
                   <div className="w-24 h-24 rounded-3xl bg-emerald-900/20 border border-emerald-800/30 flex items-center justify-center">
                     <Users className="w-10 h-10 text-emerald-600" />
@@ -393,9 +307,6 @@ export function EmployeeDirectory({
                             <p className="font-medium text-white leading-tight truncate">{emp.name}</p>
                             <p className="text-gray-500 text-xs truncate">{emp.email}</p>
                           </div>
-                          {emp.org_id === "local" && (
-                            <span className="text-[9px] bg-amber-900/40 text-amber-400 border border-amber-800/40 rounded px-1 py-0.5 font-medium flex-shrink-0">local</span>
-                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">

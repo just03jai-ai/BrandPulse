@@ -7,7 +7,14 @@ import type { Employee } from "@/types/database";
 import { DEPT_BADGE_STYLES } from "@/constants";
 import { avatarColor } from "@/lib/utils/format";
 
-type TimePeriod = "weekly" | "monthly" | "all-time";
+type TimePeriod = "weekly" | "monthly" | "quarterly" | "all-time";
+
+type RecentEngagement = {
+  employee_id: string | null;
+  engagement_type: string;
+  points: number;
+  created_at: string;
+};
 
 interface LeaderboardEntry {
   employee: Employee;
@@ -15,6 +22,7 @@ interface LeaderboardEntry {
   comments: number;
   shares: number;
   reposts: number;
+  mentions: number;
   score: number;
 }
 
@@ -28,6 +36,20 @@ const TROPHY_COLORS: Record<number, string> = {
   1: "#f59e0b",
   2: "#9ca3af",
   3: "#cd7c4c",
+};
+
+const PERIOD_LABELS: Record<TimePeriod, string> = {
+  weekly:     "Weekly",
+  monthly:    "Monthly",
+  quarterly:  "Quarterly",
+  "all-time": "All Time",
+};
+
+const PERIOD_DAYS: Record<TimePeriod, number | null> = {
+  weekly:     7,
+  monthly:    30,
+  quarterly:  90,
+  "all-time": null,
 };
 
 function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg" }) {
@@ -56,10 +78,11 @@ function DeptBadge({ dept }: { dept: string | null }) {
 
 interface Props {
   employees: Employee[];
-  engagementMap: Record<string, { likes: number; comments: number; shares: number; reposts: number }>;
+  engagementMap: Record<string, { likes: number; comments: number; shares: number; reposts: number; mentions: number }>;
+  recentEngagements: RecentEngagement[];
 }
 
-export function LeaderboardClient({ employees, engagementMap }: Props) {
+export function LeaderboardClient({ employees, engagementMap, recentEngagements }: Props) {
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("all-time");
   const [deptFilter, setDeptFilter] = useState("All");
 
@@ -70,21 +93,39 @@ export function LeaderboardClient({ employees, engagementMap }: Props) {
     return ["All", ...Array.from(depts).sort()];
   }, [employees]);
 
+  // Compute period-filtered points from the 90-day engagement window
+  const periodPointsMap = useMemo(() => {
+    const days = PERIOD_DAYS[timePeriod];
+    if (days === null) return null; // all-time: use total_points from DB
+
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const map: Record<string, number> = {};
+    for (const eng of recentEngagements) {
+      if (!eng.employee_id) continue;
+      if (new Date(eng.created_at) < cutoff) continue;
+      map[eng.employee_id] = (map[eng.employee_id] ?? 0) + (eng.points ?? 0);
+    }
+    return map;
+  }, [timePeriod, recentEngagements]);
+
   const allEntries: LeaderboardEntry[] = useMemo(() => {
     return employees
       .map((emp) => {
-        const stats = engagementMap[emp.id] ?? { likes: 0, comments: 0, shares: 0, reposts: 0 };
-        return { employee: emp, ...stats, score: emp.total_points };
+        const stats = engagementMap[emp.id] ?? { likes: 0, comments: 0, shares: 0, reposts: 0, mentions: 0 };
+        const score = periodPointsMap === null
+          ? emp.total_points              // all-time: fast denormalised value
+          : (periodPointsMap[emp.id] ?? 0); // period: summed from recent engagements
+        return { employee: emp, ...stats, score };
       })
       .sort((a, b) => b.score - a.score);
-  }, [employees, engagementMap]);
+  }, [employees, engagementMap, periodPointsMap]);
 
   const top3 = useMemo(() => allEntries.slice(0, 3), [allEntries]);
 
-  const tableEntries =
-    deptFilter === "All"
-      ? allEntries
-      : allEntries.filter((e) => e.employee.department === deptFilter);
+  const tableEntries = deptFilter === "All"
+    ? allEntries
+    : allEntries.filter((e) => e.employee.department === deptFilter);
 
   return (
     <div className="flex flex-col min-h-screen bg-[#0c0e15]">
@@ -112,7 +153,9 @@ export function LeaderboardClient({ employees, engagementMap }: Props) {
                     <p className="text-white font-semibold mt-3 text-base text-center">{entry.employee.name}</p>
                     <p className="text-gray-500 text-xs mt-0.5">{entry.employee.department ?? "—"}</p>
                     <p className="text-4xl font-bold text-white mt-4">{entry.score}</p>
-                    <p className="text-gray-500 text-xs mt-1">points</p>
+                    <p className="text-gray-500 text-xs mt-1">
+                      pts{timePeriod !== "all-time" && <span className="text-gray-600 ml-1">({PERIOD_LABELS[timePeriod].toLowerCase()})</span>}
+                    </p>
                   </div>
                 );
               })}
@@ -122,8 +165,9 @@ export function LeaderboardClient({ employees, engagementMap }: Props) {
       )}
 
       <div className="px-8 pt-5 space-y-3">
+        {/* Period filter */}
         <div className="flex items-center gap-2">
-          {(["weekly", "monthly", "all-time"] as TimePeriod[]).map((t) => (
+          {(["weekly", "monthly", "quarterly", "all-time"] as TimePeriod[]).map((t) => (
             <button
               key={t}
               onClick={() => setTimePeriod(t)}
@@ -134,11 +178,12 @@ export function LeaderboardClient({ employees, engagementMap }: Props) {
                   : "text-gray-400 hover:text-gray-200 bg-[#12151f] border border-white/5"
               )}
             >
-              {t === "weekly" ? "Weekly" : t === "monthly" ? "Monthly" : "All Time"}
+              {PERIOD_LABELS[t]}
             </button>
           ))}
         </div>
 
+        {/* Dept filter */}
         <div className="flex items-center gap-2 flex-wrap">
           {departments.map((dept) => (
             <button
@@ -168,13 +213,20 @@ export function LeaderboardClient({ employees, engagementMap }: Props) {
                 <th className="text-center px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">👍 Likes</th>
                 <th className="text-center px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">💬 Cmts</th>
                 <th className="text-center px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">🔁 Shares</th>
-                <th className="text-right px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Score</th>
+                <th className="text-center px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">↩️ Reposts</th>
+                <th className="text-center px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">@ Mentions</th>
+                <th className="text-right px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                  Score
+                  {timePeriod !== "all-time" && (
+                    <span className="ml-1 normal-case font-normal text-gray-600">({PERIOD_LABELS[timePeriod]})</span>
+                  )}
+                </th>
               </tr>
             </thead>
             <tbody>
               {tableEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-20 text-center text-gray-500 text-sm">
+                  <td colSpan={9} className="py-20 text-center text-gray-500 text-sm">
                     No employees to display.
                   </td>
                 </tr>
@@ -201,12 +253,12 @@ export function LeaderboardClient({ employees, engagementMap }: Props) {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <DeptBadge dept={entry.employee.department} />
-                      </td>
+                      <td className="px-4 py-3"><DeptBadge dept={entry.employee.department} /></td>
                       <td className="px-4 py-3 text-center text-gray-300 font-medium">{entry.likes}</td>
                       <td className="px-4 py-3 text-center text-gray-300 font-medium">{entry.comments}</td>
                       <td className="px-4 py-3 text-center text-gray-300 font-medium">{entry.shares}</td>
+                      <td className="px-4 py-3 text-center text-gray-300 font-medium">{entry.reposts}</td>
+                      <td className="px-4 py-3 text-center text-gray-300 font-medium">{entry.mentions}</td>
                       <td className="px-5 py-3 text-right">
                         <span className="text-emerald-400 font-bold text-base">{entry.score}</span>
                       </td>
@@ -224,6 +276,7 @@ export function LeaderboardClient({ employees, engagementMap }: Props) {
           <span>💬 Comment = 3 pts</span>
           <span>🔁 Share = 5 pts</span>
           <span>↩️ Repost = 5 pts</span>
+          <span>@ Mention = 2 pts</span>
         </div>
       </div>
     </div>

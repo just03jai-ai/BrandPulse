@@ -4,7 +4,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar,
 } from "recharts";
-import { Users, UserCheck, TrendingUp, Zap, ThumbsUp, MessageSquare, Share2, Repeat2 } from "lucide-react";
+import { Users, UserCheck, TrendingUp, FileText } from "lucide-react";
 
 import { DEPT_CHART_COLORS } from "@/constants";
 
@@ -19,7 +19,8 @@ interface TopEmployee {
 interface TopPost {
   id: string;
   title: string | null;
-  linkedin_post_url: string;
+  post_url: string;
+  platform: string;
   total_likes: number;
   total_comments: number;
   total_shares: number;
@@ -32,11 +33,8 @@ interface Props {
   totalEmployees: number;
   activeAdvocates: number;
   participationRate: number;
+  postsTracked: number;
   totalEngagements: number;
-  totalLikes: number;
-  totalComments: number;
-  totalShares: number;
-  totalReposts: number;
   topAdvocates: TopEmployee[];
   deptActivity: { dept: string; total: number; active: number }[];
   weeklyTrend: { week: string; advocates: number }[];
@@ -61,25 +59,8 @@ function StatCard({
   );
 }
 
-function EngagementCard({
-  label, value, icon: Icon, iconBg, iconColor,
-}: { label: string; value: number; icon: React.ElementType; iconBg: string; iconColor: string }) {
-  return (
-    <div className="bg-[#1a1a1a] border border-white/5 rounded-xl p-4 flex items-center gap-3">
-      <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBg}`}>
-        <Icon className={`w-5 h-5 ${iconColor}`} />
-      </div>
-      <div>
-        <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">{label}</p>
-        <p className="text-2xl font-bold text-white">{value.toLocaleString()}</p>
-      </div>
-    </div>
-  );
-}
-
 export function DashboardClient({
-  totalEmployees, activeAdvocates, participationRate, totalEngagements,
-  totalLikes, totalComments, totalShares, totalReposts,
+  totalEmployees, activeAdvocates, participationRate, postsTracked, totalEngagements,
   topAdvocates, deptActivity, weeklyTrend, topPosts, isConnected,
 }: Props) {
   const maxPts = topAdvocates[0]?.total_points || 1;
@@ -97,15 +78,7 @@ export function DashboardClient({
         <StatCard label="Total Employees" value={totalEmployees.toString()} sub="Registered in directory" icon={Users} iconBg="bg-emerald-900/40" />
         <StatCard label="Active Advocates" value={activeAdvocates.toString()} sub="Engaged at least once" icon={UserCheck} iconBg="bg-emerald-900/40" />
         <StatCard label="Participation Rate" value={`${participationRate}%`} sub={activeAdvocates > 0 ? "Of enrolled employees" : "No engagements yet"} icon={TrendingUp} iconBg="bg-emerald-900/40" />
-        <StatCard label="Total Engagements" value={totalEngagements.toLocaleString()} sub="Across all tracked posts" icon={Zap} iconBg="bg-emerald-900/40" />
-      </div>
-
-      {/* Engagement breakdown */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
-        <EngagementCard label="Total Likes" value={totalLikes} icon={ThumbsUp} iconBg="bg-emerald-900/30" iconColor="text-emerald-400" />
-        <EngagementCard label="Total Comments" value={totalComments} icon={MessageSquare} iconBg="bg-blue-900/30" iconColor="text-blue-400" />
-        <EngagementCard label="Total Shares" value={totalShares} icon={Share2} iconBg="bg-orange-900/30" iconColor="text-orange-400" />
-        <EngagementCard label="Total Reposts" value={totalReposts} icon={Repeat2} iconBg="bg-purple-900/30" iconColor="text-purple-400" />
+        <StatCard label="Posts Tracked" value={postsTracked.toString()} sub={`${totalEngagements.toLocaleString()} total engagements`} icon={FileText} iconBg="bg-emerald-900/40" />
       </div>
 
       {/* Charts row */}
@@ -211,7 +184,7 @@ export function DashboardClient({
           ) : (
             <div className="space-y-3">
               {topPosts.map((post) => {
-                const isIG = post.linkedin_post_url?.includes("instagram");
+                const isIG = post.platform === "instagram";
                 const empEngaged = post.total_likes + post.total_comments + post.total_shares + post.total_reposts;
                 return (
                   <div key={post.id} className="flex items-center gap-3 py-2 border-b border-white/5 last:border-0">
