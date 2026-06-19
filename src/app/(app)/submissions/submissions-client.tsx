@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { deleteSubmission } from "@/app/actions/submissions";
 import { toast } from "sonner";
 import { Plus, CheckCircle2, XCircle, Clock, Link2, ClipboardCheck, ExternalLink, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -142,17 +143,8 @@ export function SubmissionsClient({
   }
 
   async function handleDelete(sub: Submission) {
-    if (!supabase) return;
-    // If approved, remove the engagement_events row first so scores recount
-    if (sub.status === "approved") {
-      await supabase
-        .from("engagement_events")
-        .delete()
-        .eq("platform_actor_id", `manual:${sub.id}`)
-        .is("post_id", null);
-    }
-    const { error } = await supabase.from("manual_submissions").delete().eq("id", sub.id);
-    if (error) { toast.error(error.message); return; }
+    const result = await deleteSubmission(sub.id, sub.status === "approved");
+    if (result.error) { toast.error(result.error); return; }
     setSubmissions((prev) => prev.filter((s) => s.id !== sub.id));
     setPendingDeleteId(null);
     toast.success("Submission deleted.");

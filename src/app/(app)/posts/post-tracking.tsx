@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { deletePost } from "@/app/actions/posts";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -362,9 +363,8 @@ export function PostTracking({
   const syncedCount = activePosts.filter((p) => p.status === "synced").length;
 
   async function handleDelete(post: Post) {
-    if (!supabase) return;
-    const { error } = await supabase.from("company_posts").delete().eq("id", post.id);
-    if (error) { toast.error(error.message); return; }
+    const result = await deletePost(post.id);
+    if (result.error) { toast.error(result.error); return; }
     setPosts((prev) => prev.filter((p) => p.id !== post.id));
     setPendingDeleteId(null);
     toast.success("Post deleted.");
