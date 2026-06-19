@@ -37,7 +37,7 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  const publicRoutes = ["/login", "/auth/callback"];
+  const publicRoutes = ["/login", "/auth/callback", "/privacy"];
   const isPublicRoute = publicRoutes.some((route) =>
     pathname.startsWith(route)
   );
