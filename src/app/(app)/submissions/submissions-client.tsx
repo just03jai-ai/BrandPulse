@@ -247,25 +247,30 @@ export function SubmissionsClient({
       {/* Table */}
       <div className="px-8 pb-8">
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center bg-[#1a1a1a] border border-white/5 rounded-xl">
+          <div className="flex flex-col items-center justify-center py-16 text-center bg-[#1a1a1a] border border-white/5 rounded-xl">
             <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
               <ClipboardCheck className="w-7 h-7 text-gray-500" />
             </div>
             <p className="text-white font-semibold text-base mb-1">
               {statusFilter === "all" ? "No submissions yet" : `No ${statusFilter} submissions`}
             </p>
-            <p className="text-gray-500 text-sm max-w-xs mb-5">
+            <p className="text-gray-500 text-sm max-w-sm mb-5">
               {statusFilter === "all"
-                ? "Submit proof of employee engagement on official company posts."
+                ? "Manually log employee engagement on official FarMart posts. This is the recommended way to track advocacy until automated sync is live."
                 : "No submissions match this filter."}
             </p>
             {statusFilter === "all" && (
-              <button
-                onClick={() => setShowSubmitModal(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-colors"
-              >
-                <Plus className="w-4 h-4" /> Submit Proof
-              </button>
+              <>
+                <button
+                  onClick={() => setShowSubmitModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-colors mb-4"
+                >
+                  <Plus className="w-4 h-4" /> Submit Proof
+                </button>
+                <p className="text-xs text-gray-600 max-w-xs">
+                  Once automated sync is configured in Settings, employee engagement will be captured automatically and reflected on the Leaderboard and Dashboard.
+                </p>
+              </>
             )}
           </div>
         ) : (

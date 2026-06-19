@@ -264,13 +264,27 @@ export function PostTracking({
               Track LinkedIn &amp; Instagram posts and monitor employee engagement
             </p>
           </div>
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Track New Post
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="relative group">
+              <button
+                disabled
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-white/10 text-gray-500 text-sm font-medium cursor-not-allowed"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Sync Now
+              </button>
+              <div className="absolute right-0 top-full mt-1.5 w-56 px-3 py-2 bg-gray-900 border border-white/10 rounded-lg text-xs text-gray-400 hidden group-hover:block z-10 shadow-xl">
+                Automated sync coming soon. Add credentials in Settings and we&apos;ll pull engagement data automatically.
+              </div>
+            </div>
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Track New Post
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-3 mb-6">
@@ -291,6 +305,23 @@ export function PostTracking({
           </div>
         </div>
       </div>
+
+      {/* Demo guidance banner */}
+      {activePosts.length > 0 && syncedCount === 0 && (
+        <div className="px-8 pb-4">
+          <div className="flex items-start gap-3 bg-blue-950/40 border border-blue-800/40 rounded-xl px-4 py-3 text-sm text-blue-300">
+            <span className="mt-0.5 shrink-0 text-blue-400">ℹ</span>
+            <span>
+              Posts are tracked but show <span className="font-medium text-white">pending</span> — engagement data will populate once automated sync is configured.
+              In the meantime, use{" "}
+              <a href="/submissions" className="text-white font-medium underline underline-offset-2 hover:text-blue-200">
+                Submissions
+              </a>{" "}
+              to manually log employee engagement on these posts.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="px-8 pb-4 flex items-center gap-3">

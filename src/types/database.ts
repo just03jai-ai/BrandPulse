@@ -67,31 +67,13 @@ export interface PostRow {
 export interface EngagementRow {
   id: string;
   org_id: string;
-  post_id: string;
+  post_id: string | null;  // NULL for manual submission events (no post FK)
   employee_id: string | null;
   platform: "linkedin" | "instagram";
   engagement_type: "like" | "comment" | "share" | "repost" | "mention";
   platform_actor_id: string;
   points: number;
   engaged_at: string;
-  created_at: string;
-}
-
-export interface ManualProofRow {
-  id: string;
-  org_id: string;
-  employee_id: string;
-  post_id: string;
-  platform: "linkedin" | "instagram";
-  engagement_type: "like" | "comment" | "share" | "repost" | "mention";
-  proof_url: string | null;
-  notes: string | null;
-  status: "pending" | "approved" | "rejected";
-  points_awarded: number;
-  reviewed_by: string | null;
-  reviewer_notes: string | null;
-  reviewed_at: string | null;
-  engagement_event_id: string | null;
   created_at: string;
 }
 
@@ -138,10 +120,6 @@ export type PostUpdate = Partial<Omit<PostRow, "id" | "created_at">>;
 
 export type EngagementInsert = Omit<EngagementRow, "id" | "created_at">;
 
-export type ManualProofInsert = Omit<ManualProofRow,
-  "id" | "created_at" | "reviewed_by" | "reviewer_notes" | "reviewed_at" | "engagement_event_id"
->;
-
 export type ManualSubmissionInsert = Omit<ManualSubmissionRow,
   "id" | "created_at" | "reviewer_notes" | "reviewed_at"
 >;
@@ -171,11 +149,6 @@ export interface Database {
         Insert: EngagementInsert;
         Update: Partial<EngagementInsert>;
       };
-      manual_proofs: {
-        Row: ManualProofRow;
-        Insert: ManualProofInsert;
-        Update: Partial<ManualProofInsert>;
-      };
       manual_submissions: {
         Row: ManualSubmissionRow;
         Insert: ManualSubmissionInsert;
@@ -199,7 +172,6 @@ export type Employee        = EmployeeRow;
 export type CompanyPost     = PostRow;
 export type Post            = PostRow;  // backwards-compat alias
 export type EngagementEvent = EngagementRow;
-export type ManualProof       = ManualProofRow;
 export type ManualSubmission  = ManualSubmissionRow;
 export type SyncLog         = SyncLogRow;
 

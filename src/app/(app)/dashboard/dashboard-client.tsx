@@ -78,7 +78,7 @@ export function DashboardClient({
         <StatCard label="Total Employees" value={totalEmployees.toString()} sub="Registered in directory" icon={Users} iconBg="bg-emerald-900/40" />
         <StatCard label="Active Advocates" value={activeAdvocates.toString()} sub="Engaged at least once" icon={UserCheck} iconBg="bg-emerald-900/40" />
         <StatCard label="Participation Rate" value={`${participationRate}%`} sub={activeAdvocates > 0 ? "Of enrolled employees" : "No engagements yet"} icon={TrendingUp} iconBg="bg-emerald-900/40" />
-        <StatCard label="Posts Tracked" value={postsTracked.toString()} sub={`${totalEngagements.toLocaleString()} total engagements`} icon={FileText} iconBg="bg-emerald-900/40" />
+        <StatCard label="Posts Tracked" value={postsTracked.toString()} sub={`${totalEngagements.toLocaleString()} platform reach`} icon={FileText} iconBg="bg-emerald-900/40" />
       </div>
 
       {/* Charts row */}
@@ -178,14 +178,17 @@ export function DashboardClient({
 
         {/* Top Posts */}
         <div className="bg-[#1a1a1a] border border-white/5 rounded-xl p-5">
-          <p className="text-sm font-semibold text-white mb-4">Top Posts by Employee Engagement</p>
+          <div className="mb-4">
+            <p className="text-sm font-semibold text-white">Top Tracked Posts</p>
+            <p className="text-xs text-gray-500 mt-0.5">Platform-wide reach (likes + comments + shares + reposts)</p>
+          </div>
           {topPosts.length === 0 ? (
             <p className="text-gray-600 text-sm text-center py-8">No posts tracked yet</p>
           ) : (
             <div className="space-y-3">
               {topPosts.map((post) => {
                 const isIG = post.platform === "instagram";
-                const empEngaged = post.total_likes + post.total_comments + post.total_shares + post.total_reposts;
+                const totalReach = post.total_likes + post.total_comments + post.total_shares + post.total_reposts;
                 return (
                   <div key={post.id} className="flex items-center gap-3 py-2 border-b border-white/5 last:border-0">
                     <div className={`w-7 h-7 rounded flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${isIG ? "bg-pink-900/50 text-pink-300" : "bg-blue-900/50 text-blue-300"}`}>
@@ -196,8 +199,8 @@ export function DashboardClient({
                       <p className="text-xs text-gray-500">{post.published_at?.slice(0, 10) ?? "—"}</p>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-bold text-emerald-400">{empEngaged}</p>
-                      <p className="text-[10px] text-gray-500">emp. engaged</p>
+                      <p className="text-sm font-bold text-emerald-400">{totalReach}</p>
+                      <p className="text-[10px] text-gray-500">total reach</p>
                     </div>
                   </div>
                 );
@@ -206,6 +209,32 @@ export function DashboardClient({
           )}
         </div>
       </div>
+
+      {isConnected && totalEngagements === 0 && postsTracked > 0 && (
+        <div className="mt-4 flex items-start gap-3 bg-blue-950/40 border border-blue-800/40 rounded-xl p-4 text-sm text-blue-300">
+          <span className="mt-0.5 shrink-0 text-blue-400">ℹ</span>
+          <span>
+            Posts are tracked but no engagement data has been synced yet.{" "}
+            <span className="text-white font-medium">
+              Use the Submissions page to manually log employee engagement,
+            </span>{" "}
+            or set up automated sync from Settings once LinkedIn / Instagram credentials are saved.
+          </span>
+        </div>
+      )}
+
+      {isConnected && postsTracked === 0 && (
+        <div className="mt-4 flex items-start gap-3 bg-blue-950/40 border border-blue-800/40 rounded-xl p-4 text-sm text-blue-300">
+          <span className="mt-0.5 shrink-0 text-blue-400">ℹ</span>
+          <span>
+            No posts tracked yet.{" "}
+            <a href="/posts" className="text-white font-medium underline underline-offset-2 hover:text-blue-200">
+              Go to Post Tracking
+            </a>{" "}
+            to add your first LinkedIn or Instagram post URL, then log employee engagement via Submissions.
+          </span>
+        </div>
+      )}
 
       {!isConnected && (
         <div className="mt-4 bg-amber-950/50 border border-amber-800/50 rounded-xl p-4 text-sm text-amber-300">
