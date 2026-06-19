@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { LeaderboardClient } from "./leaderboard-client";
 
+export const dynamic = "force-dynamic";
+
 export default async function LeaderboardPage() {
   const supabase = await createClient();
 

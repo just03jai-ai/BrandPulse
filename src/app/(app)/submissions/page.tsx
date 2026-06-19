@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { SubmissionsClient } from "./submissions-client";
 
+export const dynamic = "force-dynamic";
+
 export default async function SubmissionsPage() {
   const supabase = await createClient();
 

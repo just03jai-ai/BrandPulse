@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { PostTracking } from "./post-tracking";
 
+export const dynamic = "force-dynamic";
+
 export default async function PostsPage() {
   const supabase = await createClient();
 
