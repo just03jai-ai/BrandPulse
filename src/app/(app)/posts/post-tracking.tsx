@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -215,15 +215,14 @@ function UpdateStatsModal({ post, onClose, onSave }: UpdateStatsModalProps) {
   const [reposts, setReposts] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Populate fields when post changes
-  useState(() => {
+  useEffect(() => {
     if (post) {
       setLikes(post.total_likes > 0 ? String(post.total_likes) : "");
       setComments(post.total_comments > 0 ? String(post.total_comments) : "");
       setShares(post.total_shares > 0 ? String(post.total_shares) : "");
       setReposts(post.total_reposts > 0 ? String(post.total_reposts) : "");
     }
-  });
+  }, [post]);
 
   function numVal(v: string) { return Math.max(0, parseInt(v, 10) || 0); }
 
@@ -251,51 +250,59 @@ function UpdateStatsModal({ post, onClose, onSave }: UpdateStatsModalProps) {
     onClose();
   }
 
+  const fields = [
+    { label: "Likes",    icon: ThumbsUp,      color: "text-emerald-400", value: likes,    set: setLikes },
+    { label: "Comments", icon: MessageSquare,  color: "text-blue-400",    value: comments, set: setComments },
+    { label: "Shares",   icon: Share2,         color: "text-orange-400",  value: shares,   set: setShares },
+    { label: "Reposts",  icon: Repeat2,        color: "text-purple-400",  value: reposts,  set: setReposts },
+  ];
+
   return (
     <Dialog open={!!post} onOpenChange={handleClose}>
-      <DialogContent className="bg-[#1a1a1a] border-white/10 text-white sm:max-w-sm">
+      <DialogContent className="bg-[#1a1a1a] border-white/10 text-white sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-white text-base">Update Engagement Stats</DialogTitle>
         </DialogHeader>
 
         {post && (
-          <div className="space-y-4 py-1">
-            <div className="rounded-lg bg-white/5 border border-white/5 px-3 py-2.5">
-              <p className="text-sm font-medium text-white truncate">{post.title ?? "Untitled"}</p>
-              <p className="text-xs text-gray-500 truncate mt-0.5">{post.post_url}</p>
+          <div className="space-y-5 py-1">
+            {/* Post info */}
+            <div className="flex items-start gap-3 rounded-lg bg-white/[0.04] border border-white/5 px-3 py-3">
+              <PlatformBadge platform={post.platform} />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-white truncate">{post.title ?? "Untitled"}</p>
+                <p className="text-xs text-gray-500 truncate mt-0.5">{post.post_url}</p>
+              </div>
             </div>
 
-            <p className="text-xs text-gray-500">
-              Enter the numbers you see on the post. Status will be set to <span className="text-emerald-400 font-medium">synced</span>.
-            </p>
-
+            {/* Stat inputs */}
             <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: "Likes", icon: ThumbsUp, color: "text-emerald-400", value: likes, set: setLikes },
-                { label: "Comments", icon: MessageSquare, color: "text-blue-400", value: comments, set: setComments },
-                { label: "Shares", icon: Share2, color: "text-orange-400", value: shares, set: setShares },
-                { label: "Reposts", icon: Repeat2, color: "text-purple-400", value: reposts, set: setReposts },
-              ].map(({ label, icon: Icon, color, value, set }) => (
+              {fields.map(({ label, icon: Icon, color, value, set }) => (
                 <div key={label} className="space-y-1.5">
-                  <Label className="text-xs text-gray-400 flex items-center gap-1.5">
-                    <Icon className={`w-3.5 h-3.5 ${color}`} />
+                  <label className={`text-xs font-medium flex items-center gap-1.5 ${color}`}>
+                    <Icon className="w-3.5 h-3.5" />
                     {label}
-                  </Label>
-                  <Input
-                    type="number"
-                    min="0"
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={value}
-                    onChange={(e) => set(e.target.value)}
+                    onChange={(e) => set(e.target.value.replace(/\D/g, ""))}
                     placeholder="0"
-                    className="bg-[#111] border-white/10 text-white h-9 text-sm focus:border-emerald-500"
+                    className="w-full h-10 rounded-lg bg-[#111] border border-white/10 px-3 text-white text-sm placeholder:text-gray-600 focus:outline-none focus:border-emerald-500 transition-colors"
                   />
                 </div>
               ))}
             </div>
+
+            <p className="text-xs text-gray-500">
+              Saving will mark this post as <span className="text-emerald-400 font-medium">synced</span> with today&apos;s timestamp.
+            </p>
           </div>
         )}
 
-        <DialogFooter className="gap-2 pt-1">
+        <DialogFooter className="gap-2 pt-2">
           <button onClick={handleClose} className="text-sm text-gray-400 hover:text-white px-4 py-2 transition-colors">
             Cancel
           </button>
