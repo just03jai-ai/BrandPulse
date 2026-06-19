@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Plus, CheckCircle2, XCircle, Clock, Link2, ClipboardCheck, ExternalLink } from "lucide-react";
+import { Plus, CheckCircle2, XCircle, Clock, Link2, ClipboardCheck, ExternalLink, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { clsx } from "clsx";
 import { getInitials } from "@/lib/utils/format";
@@ -83,6 +83,7 @@ export function SubmissionsClient({
     reviewer_notes: "",
   });
   const [reviewing, setReviewing] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const counts = {
     all:      submissions.length,
@@ -138,6 +139,23 @@ export function SubmissionsClient({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleDelete(sub: Submission) {
+    if (!supabase) return;
+    // If approved, remove the engagement_events row first so scores recount
+    if (sub.status === "approved") {
+      await supabase
+        .from("engagement_events")
+        .delete()
+        .eq("platform_actor_id", `manual:${sub.id}`)
+        .is("post_id", null);
+    }
+    const { error } = await supabase.from("manual_submissions").delete().eq("id", sub.id);
+    if (error) { toast.error(error.message); return; }
+    setSubmissions((prev) => prev.filter((s) => s.id !== sub.id));
+    setPendingDeleteId(null);
+    toast.success("Submission deleted.");
   }
 
   function openReview(s: Submission) {
@@ -340,13 +358,40 @@ export function SubmissionsClient({
                       </td>
                       <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmtDate(sub.created_at)}</td>
                       <td className="px-4 py-3">
-                        {sub.status === "pending" && (
-                          <button
-                            onClick={() => openReview(sub)}
-                            className="text-xs text-emerald-400 hover:text-emerald-300 font-medium transition-colors whitespace-nowrap"
-                          >
-                            Review →
-                          </button>
+                        {pendingDeleteId === sub.id ? (
+                          <div className="flex items-center gap-1.5 whitespace-nowrap">
+                            <button
+                              onClick={() => handleDelete(sub)}
+                              className="text-xs text-red-400 hover:text-red-300 font-medium transition-colors"
+                            >
+                              Delete
+                            </button>
+                            <span className="text-gray-700">·</span>
+                            <button
+                              onClick={() => setPendingDeleteId(null)}
+                              className="text-xs text-gray-500 hover:text-white transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {sub.status === "pending" && (
+                              <button
+                                onClick={() => openReview(sub)}
+                                className="text-xs text-emerald-400 hover:text-emerald-300 font-medium transition-colors whitespace-nowrap"
+                              >
+                                Review →
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setPendingDeleteId(sub.id)}
+                              title="Delete submission"
+                              className="p-1 rounded text-gray-600 hover:text-red-400 hover:bg-white/5 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>

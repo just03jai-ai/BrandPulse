@@ -27,6 +27,7 @@ import {
   ExternalLink,
   FileText,
   Pencil,
+  Trash2,
 } from "lucide-react";
 import type { Post } from "@/types/database";
 import { clsx } from "clsx";
@@ -337,6 +338,7 @@ export function PostTracking({
   const [showArchived, setShowArchived] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const filtered = posts.filter((p) => {
     const isArchived = p.status === "archived";
@@ -358,6 +360,15 @@ export function PostTracking({
   const archivedPosts = posts.filter((p) => p.status === "archived");
   const totalEngs = activePosts.reduce((sum, p) => sum + totalEngagements(p), 0);
   const syncedCount = activePosts.filter((p) => p.status === "synced").length;
+
+  async function handleDelete(post: Post) {
+    if (!supabase) return;
+    const { error } = await supabase.from("company_posts").delete().eq("id", post.id);
+    if (error) { toast.error(error.message); return; }
+    setPosts((prev) => prev.filter((p) => p.id !== post.id));
+    setPendingDeleteId(null);
+    toast.success("Post deleted.");
+  }
 
   async function handleArchive(post: Post) {
     if (!supabase) { toast.error("Supabase is not configured."); return; }
@@ -573,26 +584,51 @@ export function PostTracking({
                       </td>
 
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          {post.status !== "archived" && (
+                        {pendingDeleteId === post.id ? (
+                          <div className="flex items-center gap-1.5">
                             <button
-                              onClick={() => setEditingPost(post)}
-                              title="Update stats manually"
-                              className="p-1.5 rounded-md text-gray-500 hover:text-emerald-400 hover:bg-white/5 transition-colors"
+                              onClick={() => handleDelete(post)}
+                              className="text-xs text-red-400 hover:text-red-300 font-medium transition-colors whitespace-nowrap"
                             >
-                              <Pencil className="w-4 h-4" />
+                              Delete
                             </button>
-                          )}
-                          <button
-                            onClick={() => handleArchive(post)}
-                            title={post.status === "archived" ? "Restore post" : "Archive post"}
-                            className="p-1.5 rounded-md text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
-                          >
-                            {post.status === "archived"
-                              ? <ArchiveRestore className="w-4 h-4" />
-                              : <Archive className="w-4 h-4" />}
-                          </button>
-                        </div>
+                            <span className="text-gray-700">·</span>
+                            <button
+                              onClick={() => setPendingDeleteId(null)}
+                              className="text-xs text-gray-500 hover:text-white transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            {post.status !== "archived" && (
+                              <button
+                                onClick={() => setEditingPost(post)}
+                                title="Update stats manually"
+                                className="p-1.5 rounded-md text-gray-500 hover:text-emerald-400 hover:bg-white/5 transition-colors"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleArchive(post)}
+                              title={post.status === "archived" ? "Restore post" : "Archive post"}
+                              className="p-1.5 rounded-md text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
+                            >
+                              {post.status === "archived"
+                                ? <ArchiveRestore className="w-4 h-4" />
+                                : <Archive className="w-4 h-4" />}
+                            </button>
+                            <button
+                              onClick={() => setPendingDeleteId(post.id)}
+                              title="Delete post"
+                              className="p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-white/5 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
