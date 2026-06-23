@@ -176,6 +176,15 @@ export async function clearPlatformSettings(
     .eq("org_id", orgId)
     .eq("platform", platform);
 
+  // Reset posts that are stuck in error/syncing state back to pending so the
+  // UI doesn't show stale "Sync Failed" badges after credentials are cleared.
+  await supabase
+    .from("company_posts")
+    .update({ status: "pending", sync_error: null })
+    .eq("org_id", orgId)
+    .eq("platform", platform)
+    .in("status", ["error", "syncing"]);
+
   return { data: undefined as void, error: null };
 }
 

@@ -22,6 +22,7 @@ import {
   MessageSquare,
   Share2,
   Repeat2,
+  Eye,
   Archive,
   ArchiveRestore,
   RefreshCw,
@@ -54,17 +55,18 @@ function PlatformBadge({ platform }: { platform: Post["platform"] }) {
 }
 
 // Maps the DB status + connection context to a display label + style.
+// linkedInConnected = false means no account row at all (disconnected).
+// When disconnected, error/pending posts show "Awaiting Connection" instead of
+// "Sync Failed" — the error is stale and misleading without credentials.
 function resolveStatus(
   dbStatus: Post["status"],
   platform: Post["platform"],
   linkedInConnected: boolean
 ): { label: string; style: string } {
-  if (dbStatus === "pending") {
-    if (platform === "linkedin" && !linkedInConnected) {
-      return { label: "Awaiting Connection", style: "bg-amber-900/40 text-amber-400" };
-    }
-    return { label: "Awaiting Sync", style: "bg-gray-800 text-gray-400" };
+  if ((dbStatus === "pending" || dbStatus === "error") && platform === "linkedin" && !linkedInConnected) {
+    return { label: "Awaiting Connection", style: "bg-amber-900/40 text-amber-400" };
   }
+  if (dbStatus === "pending")  return { label: "Awaiting Sync",    style: "bg-gray-800 text-gray-400" };
   if (dbStatus === "syncing")  return { label: "Syncing…",          style: "bg-blue-900/50 text-blue-300" };
   if (dbStatus === "synced")   return { label: "Synced",            style: "bg-emerald-900/50 text-emerald-300" };
   if (dbStatus === "error")    return { label: "Sync Failed",       style: "bg-red-900/50 text-red-300" };
@@ -236,15 +238,16 @@ interface UpdateStatsModalProps {
   onSave: (post: Post) => void;
 }
 
-const EMPTY_STATS = { likes: "", comments: "", shares: "", reposts: "" };
+const EMPTY_STATS = { likes: "", comments: "", shares: "", reposts: "", impressions: "" };
 
 function initStats(post: Post | null) {
   if (!post) return EMPTY_STATS;
   return {
-    likes:    post.total_likes    > 0 ? String(post.total_likes)    : "",
-    comments: post.total_comments > 0 ? String(post.total_comments) : "",
-    shares:   post.total_shares   > 0 ? String(post.total_shares)   : "",
-    reposts:  post.total_reposts  > 0 ? String(post.total_reposts)  : "",
+    likes:       post.total_likes       > 0 ? String(post.total_likes)       : "",
+    comments:    post.total_comments    > 0 ? String(post.total_comments)    : "",
+    shares:      post.total_shares      > 0 ? String(post.total_shares)      : "",
+    reposts:     post.total_reposts     > 0 ? String(post.total_reposts)     : "",
+    impressions: post.total_impressions > 0 ? String(post.total_impressions) : "",
   };
 }
 
@@ -259,10 +262,11 @@ function UpdateStatsModal({ post, onClose, onSave }: UpdateStatsModalProps) {
     if (!post || !supabase) return;
     setSaving(true);
     const patch = {
-      total_likes:    numVal(stats.likes),
-      total_comments: numVal(stats.comments),
-      total_shares:   numVal(stats.shares),
-      total_reposts:  numVal(stats.reposts),
+      total_likes:        numVal(stats.likes),
+      total_comments:     numVal(stats.comments),
+      total_shares:       numVal(stats.shares),
+      total_reposts:      numVal(stats.reposts),
+      total_impressions:  numVal(stats.impressions),
       status: "synced" as const,
       last_synced_at: new Date().toISOString(),
     };
@@ -280,10 +284,11 @@ function UpdateStatsModal({ post, onClose, onSave }: UpdateStatsModalProps) {
   }
 
   const fields = [
-    { label: "Likes",    icon: ThumbsUp,     color: "text-emerald-400", value: stats.likes,    key: "likes"    as const },
-    { label: "Comments", icon: MessageSquare, color: "text-blue-400",    value: stats.comments, key: "comments" as const },
-    { label: "Shares",   icon: Share2,        color: "text-orange-400",  value: stats.shares,   key: "shares"   as const },
-    { label: "Reposts",  icon: Repeat2,       color: "text-purple-400",  value: stats.reposts,  key: "reposts"  as const },
+    { label: "Likes",       icon: ThumbsUp,     color: "text-emerald-400", value: stats.likes,       key: "likes"       as const, wide: false },
+    { label: "Comments",    icon: MessageSquare, color: "text-blue-400",    value: stats.comments,    key: "comments"    as const, wide: false },
+    { label: "Shares",      icon: Share2,        color: "text-orange-400",  value: stats.shares,      key: "shares"      as const, wide: false },
+    { label: "Reposts",     icon: Repeat2,       color: "text-purple-400",  value: stats.reposts,     key: "reposts"     as const, wide: false },
+    { label: "Impressions", icon: Eye,           color: "text-gray-300",    value: stats.impressions, key: "impressions" as const, wide: true  },
   ];
 
   return (
@@ -306,8 +311,8 @@ function UpdateStatsModal({ post, onClose, onSave }: UpdateStatsModalProps) {
 
             {/* Stat inputs */}
             <div className="grid grid-cols-2 gap-3">
-              {fields.map(({ label, icon: Icon, color, value, key }) => (
-                <div key={label} className="space-y-1.5">
+              {fields.map(({ label, icon: Icon, color, value, key, wide }) => (
+                <div key={label} className={`space-y-1.5 ${wide ? "col-span-2" : ""}`}>
                   <label className={`text-xs font-medium flex items-center gap-1.5 ${color}`}>
                     <Icon className="w-3.5 h-3.5" />
                     {label}
@@ -355,11 +360,11 @@ type PlatformFilter = "all" | "linkedin" | "instagram";
 export function PostTracking({
   initialPosts,
   error,
-  linkedInConnected,
+  linkedInStatus,
 }: {
   initialPosts: Post[];
   error?: string;
-  linkedInConnected?: boolean;
+  linkedInStatus?: "connected" | "error" | "disconnected";
 }) {
   const supabase = createClient();
   const [posts, setPosts] = useState<Post[]>(initialPosts);
@@ -370,7 +375,13 @@ export function PostTracking({
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const isLinkedInConnected = linkedInConnected ?? false;
+
+  // "disconnected" = no account row; "error" = account exists but last sync failed; "connected" = all good.
+  const effectiveStatus = linkedInStatus ?? "disconnected";
+  const isLinkedInDisconnected = effectiveStatus === "disconnected";
+  // Pass true to resolveStatus when credentials exist (even if errored) so we only
+  // show "Awaiting Connection" when there's genuinely no account row.
+  const isLinkedInConnected = !isLinkedInDisconnected;
 
   async function handleSync() {
     setSyncing(true);
@@ -396,7 +407,7 @@ export function PostTracking({
       if (supabase) {
         const { data: refreshed } = await supabase
           .from("company_posts")
-          .select("id, org_id, account_id, platform, post_url, platform_post_id, title, content_preview, published_at, last_synced_at, total_likes, total_comments, total_shares, total_reposts, total_mentions, sync_error, status, created_at")
+          .select("id, org_id, account_id, platform, post_url, platform_post_id, title, content_preview, published_at, last_synced_at, total_likes, total_comments, total_shares, total_reposts, total_impressions, total_mentions, sync_error, status, created_at")
           .neq("status", "archived")
           .order("created_at", { ascending: false });
         if (refreshed) setPosts(refreshed as Post[]);
@@ -467,21 +478,28 @@ export function PostTracking({
           <div className="flex items-center gap-2">
             <div className="relative group">
               <button
-                onClick={isLinkedInConnected ? handleSync : undefined}
-                disabled={syncing || !isLinkedInConnected}
+                onClick={!isLinkedInDisconnected ? handleSync : undefined}
+                disabled={syncing || isLinkedInDisconnected}
                 className={clsx(
                   "flex items-center gap-1.5 px-4 py-2 rounded-lg border text-sm font-medium transition-colors",
-                  isLinkedInConnected && !syncing
-                    ? "border-blue-700/60 bg-blue-950/40 text-blue-300 hover:bg-blue-900/40 hover:text-blue-200"
+                  !isLinkedInDisconnected && !syncing
+                    ? effectiveStatus === "error"
+                      ? "border-red-700/60 bg-red-950/40 text-red-300 hover:bg-red-900/40 hover:text-red-200"
+                      : "border-blue-700/60 bg-blue-950/40 text-blue-300 hover:bg-blue-900/40 hover:text-blue-200"
                     : "border-white/10 text-gray-500 cursor-not-allowed"
                 )}
               >
                 <RefreshCw className={clsx("w-4 h-4", syncing && "animate-spin")} />
                 {syncing ? "Syncing…" : "Sync Now"}
               </button>
-              {!isLinkedInConnected && (
+              {isLinkedInDisconnected && (
                 <div className="absolute right-0 top-full mt-1.5 w-64 px-3 py-2 bg-gray-900 border border-white/10 rounded-lg text-xs text-gray-400 hidden group-hover:block z-10 shadow-xl">
                   Connect LinkedIn in Settings before syncing.
+                </div>
+              )}
+              {effectiveStatus === "error" && !syncing && (
+                <div className="absolute right-0 top-full mt-1.5 w-72 px-3 py-2 bg-gray-900 border border-red-900/40 rounded-lg text-xs text-red-400 hidden group-hover:block z-10 shadow-xl">
+                  Last sync failed — token may be invalid or expired. Try again or re-save credentials in Settings.
                 </div>
               )}
             </div>
@@ -517,7 +535,7 @@ export function PostTracking({
       {/* Connection / sync guidance banner */}
       {activePosts.length > 0 && syncedCount === 0 && (
         <div className="px-8 pb-4">
-          {isLinkedInConnected ? (
+          {effectiveStatus === "connected" ? (
             <div className="flex items-start gap-3 bg-blue-950/40 border border-blue-800/40 rounded-xl px-4 py-3 text-sm text-blue-300">
               <span className="mt-0.5 shrink-0 text-blue-400">ℹ</span>
               <span>
@@ -529,11 +547,26 @@ export function PostTracking({
                 to log engagement manually.
               </span>
             </div>
+          ) : effectiveStatus === "error" ? (
+            <div className="flex items-start gap-3 bg-red-950/40 border border-red-800/40 rounded-xl px-4 py-3 text-sm text-red-300">
+              <span className="mt-0.5 shrink-0 text-red-400">⚠</span>
+              <span>
+                LinkedIn token is invalid or expired — sync cannot run.{" "}
+                <a href="/settings" className="text-white font-medium underline underline-offset-2 hover:text-red-200">
+                  Test or update your credentials in Settings
+                </a>
+                , or use{" "}
+                <a href="/submissions" className="text-white font-medium underline underline-offset-2 hover:text-red-200">
+                  Submissions
+                </a>{" "}
+                to log engagement manually in the meantime.
+              </span>
+            </div>
           ) : (
             <div className="flex items-start gap-3 bg-amber-950/40 border border-amber-800/40 rounded-xl px-4 py-3 text-sm text-amber-300">
               <span className="mt-0.5 shrink-0 text-amber-400">⚠</span>
               <span>
-                Posts are awaiting a LinkedIn connection.{" "}
+                LinkedIn is not connected.{" "}
                 <a href="/settings" className="text-white font-medium underline underline-offset-2 hover:text-amber-200">
                   Add credentials in Settings
                 </a>{" "}
@@ -610,6 +643,9 @@ export function PostTracking({
                     <th className="text-left px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Post</th>
                     <th className="text-left px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Date</th>
                     <th className="text-center px-3 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                      <span title="Impressions"><Eye className="w-3.5 h-3.5 inline text-gray-400" /></span>
+                    </th>
+                    <th className="text-center px-3 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                       <ThumbsUp className="w-3.5 h-3.5 inline text-emerald-500" />
                     </th>
                     <th className="text-center px-3 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
@@ -655,13 +691,17 @@ export function PostTracking({
                         {post.content_preview && (
                           <p className="text-xs text-gray-600 mt-0.5 truncate">{post.content_preview}</p>
                         )}
-                        {post.sync_error && (
+                        {/* Only show sync error when credentials exist — suppresses stale errors after disconnect */}
+                        {post.sync_error && post.status === "error" && !isLinkedInDisconnected && (
                           <p className="text-xs text-red-400 mt-0.5 truncate">{post.sync_error}</p>
                         )}
                       </td>
 
                       <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
                         {formatDate(post.published_at ?? post.created_at)}
+                      </td>
+                      <td className="px-3 py-3 text-center font-semibold text-gray-400">
+                        {post.total_impressions > 0 ? post.total_impressions.toLocaleString() : <span className="text-gray-700">—</span>}
                       </td>
                       <td className="px-3 py-3 text-center font-semibold text-white">{post.total_likes}</td>
                       <td className="px-3 py-3 text-center font-semibold text-white">{post.total_comments}</td>

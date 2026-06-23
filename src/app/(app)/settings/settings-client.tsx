@@ -11,6 +11,7 @@ import {
   Plus,
   Shield,
   CheckCircle2,
+  AlertCircle,
   Loader2,
   Pencil,
   Trash2,
@@ -94,9 +95,43 @@ function SecretInput({
 
 // ── Tab views ──────────────────────────────────────────────────────────────────
 
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  access_denied:
+    "Authorization was denied. If you approved, check that your LinkedIn app has the r_organization_social product enabled.",
+  missing_scope_approval:
+    "Your LinkedIn app is not approved for r_organization_social. Submit your app for LinkedIn's Marketing Developer Platform review.",
+  unauthorized_client:
+    "This app is not authorized for the required LinkedIn scopes. Check your app's product settings.",
+  missing_client_id:
+    "Save your Client ID above first, then try connecting.",
+  missing_company_id:
+    "Save your Company ID above first, then try connecting.",
+  missing_credentials:
+    "Save your Client ID and Client Secret above before connecting.",
+  state_mismatch:
+    "Security check failed. Please try connecting again.",
+  invalid_grant:
+    "The authorization code was invalid or expired. Please try connecting again.",
+  token_exchange_failed:
+    "Could not exchange the authorization code for a token. Verify your Client Secret and try again.",
+  network_error:
+    "Could not reach LinkedIn servers. Check your connection and try again.",
+  db_save_failed:
+    "Connected successfully but failed to save credentials. Please try again.",
+  not_authenticated:
+    "You are not signed in. Please refresh the page.",
+  db_not_configured:
+    "Database not configured. Contact your administrator.",
+  unknown_error:
+    "An unknown error occurred. Please try again.",
+};
+
 interface LinkedInViewProps {
   form: { company_url: string; client_id: string; company_id: string; client_secret: string; access_token: string };
   secretsSet: { linkedin_client_secret: boolean; linkedin_access_token: boolean };
+  connectionStatus: "connected" | "error" | "disconnected";
+  oauthResult?: "connected" | "error";
+  oauthReason?: string;
   onChange: (field: string, value: string) => void;
   onValidate: () => Promise<void>;
   onClear: () => Promise<void>;
@@ -104,10 +139,21 @@ interface LinkedInViewProps {
   clearing: boolean;
 }
 
-function LinkedInView({ form, secretsSet, onChange, onValidate, onClear, validating, clearing }: LinkedInViewProps) {
+function LinkedInView({
+  form, secretsSet, connectionStatus, oauthResult, oauthReason,
+  onChange, onValidate, onClear, validating, clearing,
+}: LinkedInViewProps) {
   const [editing, setEditing] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const disabled = !editing;
+
+  // OAuth connect requires client_id + client_secret + company_id to be saved
+  const canConnect =
+    Boolean(form.client_id) &&
+    Boolean(form.company_id) &&
+    secretsSet.linkedin_client_secret;
+
+  const hasToken = secretsSet.linkedin_access_token;
 
   return (
     <div className="space-y-6 rounded-xl border border-gray-800 bg-gray-900 p-6">
@@ -136,6 +182,78 @@ function LinkedInView({ form, secretsSet, onChange, onValidate, onClear, validat
         </button>
       </div>
 
+      {/* OAuth result banner */}
+      {oauthResult && (
+        <div className={cn(
+          "flex items-start gap-3 rounded-lg border p-4",
+          oauthResult === "connected"
+            ? "border-emerald-900/50 bg-emerald-950/40"
+            : "border-red-900/50 bg-red-950/40"
+        )}>
+          {oauthResult === "connected"
+            ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+            : <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />}
+          <div>
+            <p className={cn(
+              "text-sm font-medium",
+              oauthResult === "connected" ? "text-emerald-300" : "text-red-300"
+            )}>
+              {oauthResult === "connected"
+                ? "LinkedIn connected successfully via OAuth."
+                : "LinkedIn connection failed."}
+            </p>
+            {oauthResult === "error" && oauthReason && (
+              <p className="mt-1 text-xs text-gray-400">
+                {OAUTH_ERROR_MESSAGES[oauthReason] ?? OAUTH_ERROR_MESSAGES.unknown_error}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Connection status + OAuth button */}
+      <div className="flex items-center justify-between rounded-lg border border-gray-700 bg-gray-800 px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "h-2 w-2 rounded-full shrink-0",
+            connectionStatus === "connected" ? "bg-emerald-400" :
+            connectionStatus === "error" ? "bg-red-400" : "bg-gray-500"
+          )} />
+          <div>
+            <p className="text-sm font-medium text-white">
+              {connectionStatus === "connected" ? "Connected via OAuth" :
+               connectionStatus === "error" ? "Connection Error" : "Not Connected"}
+            </p>
+            <p className="text-xs text-gray-400">
+              {connectionStatus === "connected"
+                ? "Access token active — sync is enabled."
+                : connectionStatus === "error"
+                ? "Token invalid or expired. Reconnect to restore sync."
+                : "Authorize via OAuth 2.0 to enable sync."}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          disabled={!canConnect}
+          title={!canConnect ? "Save Client ID, Client Secret, and Company ID above first" : undefined}
+          onClick={() => { window.location.href = "/api/auth/linkedin/start"; }}
+          className={cn(
+            "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors shrink-0",
+            canConnect
+              ? connectionStatus === "connected"
+                ? "border border-gray-600 text-gray-300 hover:border-gray-500 hover:text-white"
+                : "bg-[#0077B5] text-white hover:bg-[#005f91]"
+              : "border border-gray-700 text-gray-600 cursor-not-allowed"
+          )}
+        >
+          <div className="flex h-4 w-4 items-center justify-center rounded bg-white/20">
+            <span className="text-[8px] font-bold leading-none">in</span>
+          </div>
+          {connectionStatus === "connected" ? "Reconnect" : "Connect LinkedIn"}
+        </button>
+      </div>
+
       <div className="space-y-1.5">
         <Label className="text-sm text-gray-300">Company Page URL</Label>
         <p className="text-xs text-gray-500">The URL of your company&apos;s LinkedIn page.</p>
@@ -156,7 +274,7 @@ function LinkedInView({ form, secretsSet, onChange, onValidate, onClear, validat
             <a href="https://developer.linkedin.com" target="_blank" rel="noopener noreferrer" className="text-green-400 hover:underline">
               LinkedIn Developer Portal
             </a>{" "}
-            under your app&apos;s Auth settings.
+            under your app&apos;s Auth settings. Save these before clicking Connect LinkedIn.
           </p>
         </div>
         <div className={cn("space-y-4 rounded-lg border border-gray-700 bg-gray-800 p-4 transition-opacity", disabled && "opacity-60")}>
@@ -196,8 +314,8 @@ function LinkedInView({ form, secretsSet, onChange, onValidate, onClear, validat
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-gray-400">Access Token</Label>
-            <p className="text-xs text-gray-500">Long-lived token with r_organization_social scope.</p>
+            <Label className="text-xs text-gray-400">Access Token <span className="text-gray-600 font-normal">(manual override)</span></Label>
+            <p className="text-xs text-gray-500">Optional. Paste a long-lived token here to skip OAuth, or if your LinkedIn app is in development mode.</p>
             <SecretInput
               isSet={secretsSet.linkedin_access_token}
               value={form.access_token}
@@ -213,14 +331,14 @@ function LinkedInView({ form, secretsSet, onChange, onValidate, onClear, validat
           <button
             type="button"
             onClick={onValidate}
-            disabled={validating || !secretsSet.linkedin_access_token}
+            disabled={validating || !hasToken}
             className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-600 text-sm text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-40 transition-colors"
           >
             {validating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
             Test Connection
           </button>
-          {!secretsSet.linkedin_access_token && (
-            <p className="text-xs text-gray-500">Save an access token first to test.</p>
+          {!hasToken && (
+            <p className="text-xs text-gray-500">Connect via OAuth or save a token to test.</p>
           )}
         </div>
 
@@ -480,11 +598,19 @@ function InstagramView({ form, secretsSet, onChange, onHandlesChange, onValidate
 
 export function SettingsClient({
   initialSettings,
+  linkedInConnectionStatus = "disconnected",
+  oauthResult,
+  oauthReason,
+  initialTab = "linkedin",
 }: {
   userEmail?: string;
   initialSettings: OrgCredentialsPublic | null;
+  linkedInConnectionStatus?: "connected" | "error" | "disconnected";
+  oauthResult?: "connected" | "error";
+  oauthReason?: string;
+  initialTab?: "linkedin" | "instagram";
 }) {
-  const [activeTab, setActiveTab] = useState<TabId>("linkedin");
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
 
   const {
     linkedIn, setLinkedIn,
@@ -536,6 +662,9 @@ export function SettingsClient({
             <LinkedInView
               form={linkedIn}
               secretsSet={{ linkedin_client_secret: secretsSet.linkedin_client_secret, linkedin_access_token: secretsSet.linkedin_access_token }}
+              connectionStatus={linkedInConnectionStatus}
+              oauthResult={oauthResult}
+              oauthReason={oauthReason}
               onChange={(field, value) => setLinkedIn((f) => ({ ...f, [field]: value }))}
               onValidate={testLinkedIn}
               onClear={clearLinkedIn}

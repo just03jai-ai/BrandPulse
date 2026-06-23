@@ -36,6 +36,7 @@ interface PostStats {
   likes: number;
   comments: number;
   shares: number;
+  impressions: number;
 }
 
 interface EngagementRecord {
@@ -75,10 +76,18 @@ async function fetchPostStats(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+    if (res.status === 401) {
+      console.error("[linkedin-sync] 401 from LinkedIn API — token invalid or expired", { shareUrn });
+      throw new Error("LinkedIn token invalid or expired. Re-save your access token in Settings.");
+    }
+    if (res.status === 403) {
+      console.error("[linkedin-sync] 403 from LinkedIn API — missing r_organization_social permission", { shareUrn });
+      throw new Error("LinkedIn token lacks required permissions (r_organization_social scope needed).");
+    }
     const errObj = body?.error as Record<string, unknown> | undefined;
-    throw new Error(
-      (body?.message as string) ?? (errObj?.message as string) ?? `LinkedIn API returned ${res.status}`
-    );
+    const msg = (body?.message as string) ?? (errObj?.message as string) ?? `LinkedIn API returned ${res.status}`;
+    console.error("[linkedin-sync] LinkedIn API error", { status: res.status, shareUrn, message: msg });
+    throw new Error(msg);
   }
 
   const data   = await res.json() as Record<string, unknown>;
@@ -86,9 +95,10 @@ async function fetchPostStats(
   const stats  = (elems[0]?.totalShareStatistics ?? {}) as Record<string, number>;
 
   return {
-    likes:    stats.likeCount    ?? 0,
-    comments: stats.commentCount ?? 0,
-    shares:   stats.shareCount   ?? 0,
+    likes:       stats.likeCount       ?? 0,
+    comments:    stats.commentCount    ?? 0,
+    shares:      stats.shareCount      ?? 0,
+    impressions: stats.impressionCount ?? 0,
   };
 }
 
@@ -187,12 +197,14 @@ export async function POST() {
     .maybeSingle() as unknown as Promise<{ data: Record<string, string> | null }>);
 
   if (!account) {
+    console.warn("[linkedin-sync] No LinkedIn account row found for org", orgId, "— credentials not saved yet");
     return NextResponse.json(
-      { error: "Connect LinkedIn in Settings before syncing." },
+      { error: "LinkedIn is not connected. Add credentials in Settings before syncing." },
       { status: 400 }
     );
   }
   if (!account.access_token) {
+    console.warn("[linkedin-sync] LinkedIn account row exists but access_token is null for org", orgId);
     return NextResponse.json(
       { error: "No LinkedIn access token found. Re-save credentials in Settings." },
       { status: 400 }
@@ -259,6 +271,7 @@ export async function POST() {
     const urn = extractLinkedInUrn(post.post_url, post.platform_post_id ?? null);
 
     if (!urn) {
+      console.warn("[linkedin-sync] Cannot extract URN from post URL", { postId: post.id, postUrl: post.post_url });
       await supabase.from("company_posts").update({
         status:         "error",
         sync_error:     "Could not extract post URN from URL. Paste the full /feed/update/ URL.",
@@ -277,13 +290,14 @@ export async function POST() {
       );
 
       await supabase.from("company_posts").update({
-        total_likes:      stats.likes,
-        total_comments:   stats.comments,
-        total_shares:     stats.shares,
-        platform_post_id: urn,
-        status:           "synced",
-        sync_error:       null,
-        last_synced_at:   new Date().toISOString(),
+        total_likes:        stats.likes,
+        total_comments:     stats.comments,
+        total_shares:       stats.shares,
+        total_impressions:  stats.impressions,
+        platform_post_id:   urn,
+        status:             "synced",
+        sync_error:         null,
+        last_synced_at:     new Date().toISOString(),
       }).eq("id", post.id);
 
       postsSynced++;
@@ -316,6 +330,7 @@ export async function POST() {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown sync error";
+      console.error("[linkedin-sync] Post sync failed", { postId: post.id, postUrl: post.post_url, urn, error: msg });
       await supabase.from("company_posts").update({
         status:         "error",
         sync_error:     msg,

@@ -58,6 +58,7 @@ export interface PostRow {
   total_comments: number;
   total_shares: number;
   total_reposts: number;
+  total_impressions: number;
   total_mentions: number;
   sync_error: string | null;
   status: "pending" | "syncing" | "synced" | "error" | "archived";
@@ -101,6 +102,7 @@ export interface CompanySocialAccountRow {
   display_name: string | null;
   company_url: string | null;
   access_token: string | null;
+  token_expires_at: string | null;
   sync_enabled: boolean;
   connection_status: "connected" | "disconnected" | "error";
   sync_error: string | null;
@@ -131,7 +133,7 @@ export type EmployeeInsert = Omit<EmployeeRow,
 export type EmployeeUpdate = Partial<Omit<EmployeeRow, "id" | "created_at" | "updated_at">>;
 
 export type PostInsert = Omit<PostRow,
-  "id" | "created_at" | "total_likes" | "total_comments" | "total_shares" | "total_reposts" | "total_mentions" | "sync_error" | "account_id"
+  "id" | "created_at" | "total_likes" | "total_comments" | "total_shares" | "total_reposts" | "total_impressions" | "total_mentions" | "sync_error" | "account_id"
 >;
 export type PostUpdate = Partial<Omit<PostRow, "id" | "created_at">>;
 
